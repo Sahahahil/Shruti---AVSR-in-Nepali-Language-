@@ -1,5 +1,1 @@
-opencv-python
-mediapipe
-numpy
-sounddevice
-scipy
+# Shruti---AVSR-in-Nepali-Language-
