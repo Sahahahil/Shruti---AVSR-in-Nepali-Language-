@@ -1,1 +1,5 @@
-# Shruti---AVSR-in-Nepali-Language-
+opencv-python
+mediapipe
+numpy
+sounddevice
+scipy
