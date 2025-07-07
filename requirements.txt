@@ -1,8 +1,0 @@
-torch
-transformers
-mltu
-onnx
-onnxruntime
-librosa 
-soundfile
-accelerate
