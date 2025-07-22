@@ -11,8 +11,8 @@ FRAME_DURATION_MS = 30  # ms for VAD (10, 20 or 30 only)
 FRAME_SIZE = int(SAMPLING_RATE * FRAME_DURATION_MS / 1000)
 
 # --- Model Paths ---
-MODEL_PATH = "wav2vec2-nepali-finetuned-v2"
-PROCESSOR_PATH = "wav2vec2-nepali-processor"
+MODEL_PATH = "/home/sahilduwal/MajorProject/Shruti---AVSR-in-Nepali-Language-/nep-2/wav2vec2-nepali-finetuned-v2"
+PROCESSOR_PATH = "/home/sahilduwal/MajorProject/Shruti---AVSR-in-Nepali-Language-/nep-2/wav2vec2-nepali-processor"
 
 # --- Load processor and model ---
 processor = Wav2Vec2Processor.from_pretrained(PROCESSOR_PATH)
