@@ -1,30 +1,87 @@
 .navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 15vh;
+  font-family: 'Courier New', Courier, monospace;
   display: flex;
-  justify-content: space-between;
+  justify-content: space-evenly;
   align-items: center;
-  padding: 1rem 2rem;
-  background: #fff;
-  border-bottom: 1px solid #eee;
+  z-index: 50;
+  background: transparent;
+  transition: height 0.6s ease, background 0.6s ease; // smooth height + background
 
-  .nav-logo {
-    font-weight: 700;
-    font-size: 1.2rem;
-  }
+  &.scrolled {
+    background: #000;
+    height: 9vh;
 
-  .nav-links {
-    display: flex;
-    gap: 1.5rem;
-    list-style: none;
+    .nav-links{
 
-    a {
-      text-decoration: none;
-      color: #000;
-      font-weight: 500;
-      transition: 0.2s ease;
+      a {
+        color: #fff; // links turn white when scrolled
+      } 
+    }
 
-      &:hover {
-        color: #555;
+    .nav-logo {
+      a{
+
+        color: #fff; // logo turns white when scrolled
       }
     }
   }
+
+  .nav-logo {
+    a{
+      font-weight: 700;
+      
+      font-size: 1.8rem;
+      text-decoration: none;
+      color: #000; // default black
+      transition: color 0.6s ease;
+      &:hover{
+        cursor: pointer;
+      }
+    }
+  }
+
+  
+  .nav-links {
+    display: flex;
+    font-size: 1.5em;
+    width: 40%;
+    justify-content: space-evenly;
+    list-style: none;
+  
+    a {
+      font-weight: 900;
+      color: #000000; // default white
+      text-decoration: none;
+      position: relative; // for pseudo-element
+      padding: 5px 0;
+      transition: color 0.3s ease;
+  
+      // underline on hover
+      &::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        width: 0%;
+        height: 2px;
+        background: #fff;
+        transition: width 0.3s ease;
+      }
+  
+      &:hover::after {
+        width: 100%;
+      }
+  
+      // persistent underline for active link
+      &.active::after {
+        width: 100%;
+      }
+    }
+  }
+  
 }
