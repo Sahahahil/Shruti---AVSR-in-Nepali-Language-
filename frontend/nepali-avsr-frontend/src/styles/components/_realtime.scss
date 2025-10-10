@@ -1,0 +1,186 @@
+// .realtime-container {
+//   min-height: 100vh;
+//   background: #fff2f2;
+//   color: #060202;
+//   display: flex;
+//   flex-direction: column;
+//   align-items: center;
+//   justify-content: center;
+//   padding-top: 10vh;
+
+//   h1 {
+//     font-family: 'Montserrat', sans-serif;
+//     font-weight: 800;
+//     font-size: 2.5rem;
+//     margin-bottom: 2rem;
+//   }
+
+//   .video-wrapper {
+//     width: 60%;
+//     max-width: 700px;
+//     aspect-ratio: 16/9;
+//     border: 3px solid #fff;
+//     border-radius: 10px;
+//     overflow: hidden;
+//     background: #111;
+//     display: flex;
+//     align-items: center;
+//     justify-content: center;
+
+//     video {
+//       width: 100%;
+//       height: 100%;
+//       object-fit: cover;
+//       border-radius: 10px;
+//     }
+//   }
+
+//   .controls {
+//     margin-top: 1.5rem;
+
+//     button {
+//       padding: 0.8rem 1.5rem;
+//       font-size: 1rem;
+//       font-family: 'Montserrat', sans-serif;
+//       border: none;
+//       border-radius: 30px;
+//       cursor: pointer;
+//       background: #079a1b;
+//       color: #ffffff;
+//       font-weight: 700;
+//       transition: all 0.3s ease;
+
+//       &:hover {
+//         background: #222;
+//         color: #fff;
+//         transform: scale(1.05);
+//       }
+//     }
+//   }
+
+//   .error {
+//     margin-top: 1rem;
+//     color: #ff5555;
+//     font-size: 0.9rem;
+//   }
+// }
+
+///////////////////////////////////////////////////
+///
+.realtime-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 3rem;
+  background-image: url("/realtime-bg.jpg");
+  padding-top: 15vh;
+  background-size: cover;
+  background-position: center;
+
+  h1 {
+    font-family: "Montserrat", sans-serif;
+    margin-bottom: 1.5rem;
+    color: #000;
+  }
+
+  /* --- VIDEO CONTAINER --- */
+  .video-container {
+    width: 40vw; /* fixed width */
+    aspect-ratio: 16 / 9; /* consistent frame */
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+    background-color: #000;
+    // box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  /* --- VIDEO ELEMENTS --- */
+  .live-video,
+  .recorded-preview {
+    width: 100%;
+    height: 100%;
+    object-fit: contain; /* ensures no cropping */
+    object-position: center; /* centers the video */
+    border-radius: 12px;
+    background-color: #000; /* placeholder background */
+    display: block;
+  }
+  .live-video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain; // shows full frame without cropping
+    transition: opacity 0.4s ease;
+    border-radius: 12px;
+  }
+  
+
+  /* --- CONTROLS --- */
+  .controls {
+    margin-top: 1rem;
+    display: flex;
+    gap: 1rem;
+
+    button {
+      background: #000;
+      color: #fff;
+      border: none;
+      padding: 0.7rem 1.5rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 1.2rem;
+      transition: all 0.3s ease;
+
+      &:hover {
+        background: #3c89ad;
+      }
+    }
+  }
+
+  /* --- COUNTDOWN OVERLAY --- */
+  .countdown-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(0, 0, 0, 0.4);
+    z-index: 10;
+    width: 100%;
+
+    h1 {
+      font-size: 6rem;
+      font-weight: 900;
+      color: #fff;
+      animation: pulse 1s infinite;
+    }
+  }
+
+  /* --- PULSE ANIMATION --- */
+  @keyframes pulse {
+    0% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1.5);
+      opacity: 0.5;
+    }
+  }
+
+  /* --- RESPONSIVE ADJUSTMENTS --- */
+  @media (max-width: 768px) {
+    .video-container {
+      width: 85vw; /* make it larger on smaller screens */
+    }
+
+    .countdown-overlay h1 {
+      font-size: 3.5rem;
+    }
+  }
+}
