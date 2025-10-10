@@ -4,7 +4,6 @@
   left: 0;
   width: 100vw;
   height: 15vh;
-  font-family: 'Courier New', Courier, monospace;
   display: flex;
   justify-content: space-evenly;
   align-items: center;
@@ -13,8 +12,8 @@
   transition: height 0.6s ease, background 0.6s ease; // smooth height + background
 
   &.scrolled {
-    background: #000;
-    height: 9vh;
+    background: #141313e1;
+    height: 6vh;
 
     .nav-links{
 
@@ -35,7 +34,7 @@
     a{
       font-weight: 700;
       
-      font-size: 1.8rem;
+      font-size: 1.5rem;
       text-decoration: none;
       color: #000; // default black
       transition: color 0.6s ease;
@@ -48,13 +47,13 @@
   
   .nav-links {
     display: flex;
-    font-size: 1.5em;
+    font-size: 1.4em;
     width: 40%;
     justify-content: space-evenly;
     list-style: none;
   
     a {
-      font-weight: 900;
+      font-weight: 600;
       color: #000000; // default white
       text-decoration: none;
       position: relative; // for pseudo-element
@@ -69,7 +68,7 @@
         bottom: 0;
         width: 0%;
         height: 2px;
-        background: #fff;
+        background: #bb7b13;
         transition: width 0.3s ease;
       }
   
