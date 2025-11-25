@@ -1,72 +1,3 @@
-// .realtime-container {
-//   min-height: 100vh;
-//   background: #fff2f2;
-//   color: #060202;
-//   display: flex;
-//   flex-direction: column;
-//   align-items: center;
-//   justify-content: center;
-//   padding-top: 10vh;
-
-//   h1 {
-//     font-family: 'Montserrat', sans-serif;
-//     font-weight: 800;
-//     font-size: 2.5rem;
-//     margin-bottom: 2rem;
-//   }
-
-//   .video-wrapper {
-//     width: 60%;
-//     max-width: 700px;
-//     aspect-ratio: 16/9;
-//     border: 3px solid #fff;
-//     border-radius: 10px;
-//     overflow: hidden;
-//     background: #111;
-//     display: flex;
-//     align-items: center;
-//     justify-content: center;
-
-//     video {
-//       width: 100%;
-//       height: 100%;
-//       object-fit: cover;
-//       border-radius: 10px;
-//     }
-//   }
-
-//   .controls {
-//     margin-top: 1.5rem;
-
-//     button {
-//       padding: 0.8rem 1.5rem;
-//       font-size: 1rem;
-//       font-family: 'Montserrat', sans-serif;
-//       border: none;
-//       border-radius: 30px;
-//       cursor: pointer;
-//       background: #079a1b;
-//       color: #ffffff;
-//       font-weight: 700;
-//       transition: all 0.3s ease;
-
-//       &:hover {
-//         background: #222;
-//         color: #fff;
-//         transform: scale(1.05);
-//       }
-//     }
-//   }
-
-//   .error {
-//     margin-top: 1rem;
-//     color: #ff5555;
-//     font-size: 0.9rem;
-//   }
-// }
-
-///////////////////////////////////////////////////
-///
 .realtime-container {
   min-height: 100vh;
   display: flex;
@@ -84,6 +15,7 @@
     margin-bottom: 1.5rem;
     color: #000;
   }
+  
 
   /* --- VIDEO CONTAINER --- */
   .video-container {
