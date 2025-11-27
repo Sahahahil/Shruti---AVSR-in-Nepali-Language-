@@ -15,9 +15,9 @@ FRAME_DURATION_MS = 30  # ms for VAD (10, 20 or 30 only)
 FRAME_SIZE = int(SAMPLING_RATE * FRAME_DURATION_MS / 1000)
 
 # --- Model Paths ---
-MODEL_PATH = "/home/sahil_duwal/MajorProject/Shruti---AVSR-in-Nepali-Language-/nep-2/wav2vec2_custom_head"
-TOKENIZER_DIR = "/home/sahil_duwal/MajorProject/Shruti---AVSR-in-Nepali-Language-/nep-2/tokenizer_nepali"
-PRETRAINED_W2V = "/home/sahil_duwal/MajorProject/Shruti---AVSR-in-Nepali-Language-/nep-2/wav2vec2-nepali-finetuned-v2"
+MODEL_PATH = "/home/archy_sahil/MajorProject/Shruti---AVSR-in-Nepali-Language-/nep-2/wav2vec2_custom_head-2"
+TOKENIZER_DIR = "/home/archy_sahil/MajorProject/Models & Processors/tokenizer"
+PRETRAINED_W2V = "/home/archy_sahil/MajorProject/Models & Processors/wav2vec2-nepali-finetuned-v2"
 
 # --- Custom Model Classes (from your training script) ---
 class Adapter(nn.Module):

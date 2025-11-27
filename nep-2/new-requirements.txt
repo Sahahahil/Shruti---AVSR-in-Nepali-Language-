@@ -1,0 +1,27 @@
+# Core dependencies
+numpy
+torch
+torchaudio
+transformers
+datasets
+evaluate
+accelerate
+
+# Audio processing
+librosa
+soundfile
+audioread
+
+# Data handling
+pandas
+scikit-learn
+
+# Utility
+sentencepiece
+jiwer
+
+# Optional but recommended
+jupyter
+ipykernel
+matplotlib
+tensorboard
