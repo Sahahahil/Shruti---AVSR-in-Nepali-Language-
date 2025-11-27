@@ -1,14 +1,28 @@
-# Data collector from Facebook 
-1. Takes in facebook post link and title/status.
-2. Download videos.
-3. Extracts audios.
-4. Extracts lip frames from the video.
-5. Aligns audio and text.
-6. Processes the sample and outputs .json file.
+# Facebook Data Collector (Nepali AVSR dataset)
 
-## Requirements
-### 2nd line is only for Arch-Linux, Manager youself for Windows.
+This repository contains tools to download Facebook videos, extract audio and lip-region frames, and align audio with text using Whisper word timestamps.
+
+Main script:
+- [file5.py](file5.py) — entrypoint for dataset collection and alignment. Key functions: [`get_whisper_model`](file5.py), [`download_fb_video`](file5.py), [`extract_audio`](file5.py), [`extract_lip_frames`](file5.py), [`align_audio_text`](file5.py), [`process_sample`](file5.py).
+
+Legacy notebooks:
+- [file1.ipynb](file1.ipynb)
+- [file2.ipynb](file2.ipynb)
+
+Quickstart (Linux / macOS)
+1. Install system packages (FFmpeg required):
+```sh
+# Debian/Ubuntu
+sudo apt update
+sudo apt install -y ffmpeg
 ```
+
+2. Install Python packages:
+```sh
 pip install yt_dlp opencv-python mediapipe aeneas tqdm
-sudo apt install ffmpeg espeak
+```
+
+3. Download and process videos:
+```sh
+python file5.py --fb-link https://www.facebook.com/... --title "..."
 ```

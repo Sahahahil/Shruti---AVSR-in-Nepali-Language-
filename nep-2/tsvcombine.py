@@ -13,9 +13,9 @@ def combine_tsv(file1, file2, output_file):
 
 if __name__ == "__main__":
     # Example usage
-    file1 = "/home/sahil_duwal/MajorProject/Dataset/male-female-data/MaleVoice.tsv"
-    file2 = "/home/sahil_duwal/MajorProject/Dataset/male-female-data/FemaleVoice.tsv"
-    output_file = "/home/sahil_duwal/MajorProject/Dataset/male-female-data/combined.tsv"
+    file1 = "/home/archy_sahil/Downloads/Dataset(Major)/Combined/TSV/1-combined.tsv"
+    file2 = "/home/archy_sahil/Downloads/Dataset(Major)/ne_np_female/line_index.tsv"
+    output_file = "/home/archy_sahil/Downloads/Dataset(Major)/Combined/TSV/Final-combined.tsv"
 
     combine_tsv(file1, file2, output_file)
     print(f"Combined file saved as {output_file}")

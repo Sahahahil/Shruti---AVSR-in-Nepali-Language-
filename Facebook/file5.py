@@ -25,7 +25,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '0'  # GPU for Whisper
 os.environ['MEDIAPIPE_DISABLE_GPU'] = '1'  # CPU for MediaPipe
 
 # ---------- CONFIG ----------
-DATA_ROOT = "dataset-oct-21-b"
+DATA_ROOT = "dataset-nov-16"
 os.makedirs(DATA_ROOT, exist_ok=True)
 
 # Detect device for Whisper
