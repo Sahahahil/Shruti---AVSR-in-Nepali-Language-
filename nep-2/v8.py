@@ -53,8 +53,8 @@ print(f"Torchaudio available: {TORCHAUDIO_AVAILABLE}")
 # # Configurations
 
 # %%
-TSV_PATH = "/home/archy_sahil/Downloads/Dataset(Major)/ne_np_female/line_index.tsv"
-AUDIO_BASE = "/home/archy_sahil/Downloads/Dataset(Major)/ne_np_female/wavs"
+TSV_PATH = "/home/archy_sahil/MajorProject/College_dataset/Dataset_College_Server/dataset-dec-5-a/07-Dec.tsv"
+AUDIO_BASE = "/home/archy_sahil/MajorProject/College_dataset/Dataset_College_Server/dataset-dec-5-a/audio"
 TOKENIZER_DIR = "./tokenizer_nepali-3"
 PRETRAINED_W2V = "/home/archy_sahil/MajorProject/Models & Processors/wav2vec2-nepali-finetuned-v2"
 CACHE_DIR = "./cache"
