@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AVSR Transcription</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 50px; }
+#transcript { margin-top: 20px; font-size: 18px; color: #333; }
+</style>
+</head>
+<body>
+<h2>Upload a Video to Transcribe</h2>
+<form id="uploadForm">
+    <input type="file" id="fileInput" name="file" accept=".webm,.mp4,.webp" required>
+    <button type="submit">Transcribe</button>
+</form>
+<div id="transcript"></div>
+
+<script>
+const form = document.getElementById("uploadForm");
+form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fileInput = document.getElementById("fileInput");
+    if (!fileInput.files.length) return alert("Please select a file.");
+    
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+
+    const res = await fetch("/transcribe", { method: "POST", body: formData });
+    const data = await res.json();
+    document.getElementById("transcript").innerText = data.transcription || data.error;
+});
+</script>
+</body>
+</html>

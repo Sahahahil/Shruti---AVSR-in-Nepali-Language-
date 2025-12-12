@@ -22,11 +22,6 @@ export default function Navbar() {
                 <Link href="/">Shruti: Nepali AVSR</Link>
             </div>
             <ul className="nav-links">
-                {/* <li>
-                    <Link href="/" className={pathname === "/" ? "active" : ""}>
-                        Home
-                    </Link>
-                </li> */}
                 <li>
                     <Link
                         href="/realtime"
@@ -46,7 +41,7 @@ export default function Navbar() {
                 <li>
                     <Link
                         href="/contact"
-                        className={pathname === "/offline" ? "active" : ""}
+                        className={pathname === "/contact" ? "active" : ""}
                     >
                         Contact Us
                     </Link>
