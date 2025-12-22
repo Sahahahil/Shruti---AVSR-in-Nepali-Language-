@@ -628,6 +628,19 @@ if __name__ == "__main__":
         dropout=DROPOUT
     )
     model.to(DEVICE)
+    # Reduce peak memory: enable gradient checkpointing on wav2vec backbone if available
+    try:
+        if hasattr(model, 'wav2vec') and hasattr(model.wav2vec, 'gradient_checkpointing_enable'):
+            model.wav2vec.gradient_checkpointing_enable()
+            print("✅ Enabled gradient checkpointing on wav2vec backbone (reduces memory, increases compute).")
+    except Exception:
+        pass
+
+    # Clear CUDA cache after moving model to device to reduce fragmentation
+    try:
+        torch.cuda.empty_cache()
+    except Exception:
+        pass
     
     # Collator
     data_collator = DataCollatorCTCWithAugment(
@@ -648,11 +661,12 @@ if __name__ == "__main__":
             output_dir=OUTPUT_DIR,
             per_device_train_batch_size=BATCH_SIZE,
             per_device_eval_batch_size=BATCH_SIZE,
-            gradient_accumulation_steps=4,
+            # Lower accumulation reduces peak memory on low-memory GPUs
+            gradient_accumulation_steps=1,
             num_train_epochs=EPOCHS,
             learning_rate=LR,
-            # CRITICAL FIX: Disabled FP16 for stability
-            fp16=False, 
+            # Use mixed precision to reduce memory footprint. If you encounter instability, set to False.
+            fp16=True,
             save_total_limit=2,
             logging_steps=10,
             save_steps=200,
