@@ -223,4 +223,6 @@ const Recorder = forwardRef<RecorderHandle, RecorderProps>(
     }
 );
 
+Recorder.displayName = 'Recorder';
+
 export default Recorder;

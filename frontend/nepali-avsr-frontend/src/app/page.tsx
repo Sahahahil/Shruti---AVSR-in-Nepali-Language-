@@ -1,13 +1,5 @@
-import Navbar from "@/components/Navbar";
-import Hero from "@/components/Hero";
-import Footer from "@/components/Footer";
+import Dashboard from '@/components/Dashboard';
 
 export default function HomePage() {
-  return (
-    <>
-      <Navbar />
-      <Hero />
-      <Footer />
-    </>
-  );
+  return <Dashboard />;
 }

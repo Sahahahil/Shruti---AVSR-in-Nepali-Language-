@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local media/model artifacts accidentally placed in frontend
+public/uploads/
+public/tmp/
+*.onnx
+*.pth
+*.pt
