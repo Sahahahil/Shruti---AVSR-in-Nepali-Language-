@@ -31,16 +31,6 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-.app-shell {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.app-content {
-  flex: 1;
-}
-
 // Headings
 h1, h2, h3, h4, h5, h6 {
   font-family: 'Inter', sans-serif;

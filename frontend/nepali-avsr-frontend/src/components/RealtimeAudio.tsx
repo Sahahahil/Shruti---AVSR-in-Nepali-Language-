@@ -6,25 +6,17 @@ import styles from '@/styles/tab-content.module.scss';
 interface RealtimeAudioProps {
   isStreaming: boolean;
   onAudio: (samples: Float32Array) => void;
-  onSoundActivityChange?: (active: boolean, level: number) => void;
 }
 
-const RealtimeAudio: React.FC<RealtimeAudioProps> = ({
-  isStreaming,
-  onAudio,
-  onSoundActivityChange,
-}) => {
+const RealtimeAudio: React.FC<RealtimeAudioProps> = ({ isStreaming, onAudio }) => {
   const [level, setLevel] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const contextRef = useRef<AudioContext | null>(null);
-  const silenceFramesRef = useRef(0);
 
   useEffect(() => {
     if (!isStreaming) {
       setLevel(0);
       setError(null);
-      silenceFramesRef.current = 0;
-      onSoundActivityChange?.(false, 0);
       if (contextRef.current) {
         contextRef.current.close();
         contextRef.current = null;
@@ -64,19 +56,7 @@ const RealtimeAudio: React.FC<RealtimeAudioProps> = ({
           for (let i = 0; i < samples.length; i++) {
             sum += Math.abs(samples[i]);
           }
-          const newLevel = Math.min(100, (sum / samples.length) * 600);
-          setLevel(newLevel);
-
-          const speakingNow = newLevel >= 7;
-          if (speakingNow) {
-            silenceFramesRef.current = 0;
-          } else {
-            silenceFramesRef.current += 1;
-          }
-
-          // Add a small hangover so short pauses do not immediately stop predictions.
-          const active = speakingNow || silenceFramesRef.current < 4;
-          onSoundActivityChange?.(active, newLevel);
+          setLevel(Math.min(100, (sum / samples.length) * 600));
           onAudio(samples);
         };
 
@@ -104,9 +84,8 @@ const RealtimeAudio: React.FC<RealtimeAudioProps> = ({
         contextRef.current.close();
         contextRef.current = null;
       }
-      onSoundActivityChange?.(false, 0);
     };
-  }, [isStreaming, onAudio, onSoundActivityChange]);
+  }, [isStreaming, onAudio]);
 
   return (
     <div className={styles.audioPanel}>

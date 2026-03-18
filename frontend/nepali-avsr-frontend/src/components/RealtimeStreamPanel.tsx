@@ -51,8 +51,6 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
     confidence?: number;
     classification?: string;
   } | null>(null);
-  const [hasSound, setHasSound] = useState(false);
-  const [hasLipMovement, setHasLipMovement] = useState(false);
 
   const wsUrl = useMemo(() => {
     const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -69,8 +67,6 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
   const stopStreaming = useCallback(() => {
     setIsStreaming(false);
     setStatus('idle');
-    setHasSound(false);
-    setHasLipMovement(false);
     closeSocket();
   }, [closeSocket]);
 
@@ -138,24 +134,11 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
     if (mode === 'asr_only') {
       return;
     }
-
-    if (mode === 'vsr_only' && !hasLipMovement) {
-      return;
-    }
-
-    if (mode === 'avsr' && !hasSound && !hasLipMovement) {
-      return;
-    }
-
     wsRef.current.send(JSON.stringify({ type: 'frame', data: dataUrl }));
-  }, [isStreaming, mode, hasLipMovement, hasSound]);
+  }, [isStreaming, mode]);
 
   const sendAudio = useCallback((samples: Float32Array) => {
     if (!isStreaming || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      return;
-    }
-
-    if ((mode === 'asr_only' || mode === 'avsr') && !hasSound) {
       return;
     }
 
@@ -165,20 +148,7 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
     }
 
     wsRef.current.send(JSON.stringify({ type: 'audio', data: Array.from(samples) }));
-  }, [isStreaming, mode, hasSound]);
-
-  const isPredictionPaused = useMemo(() => {
-    if (!isStreaming) {
-      return false;
-    }
-    if (mode === 'asr_only') {
-      return !hasSound;
-    }
-    if (mode === 'vsr_only') {
-      return !hasLipMovement;
-    }
-    return !hasSound && !hasLipMovement;
-  }, [hasLipMovement, hasSound, isStreaming, mode]);
+  }, [isStreaming]);
 
   const handleUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -221,13 +191,7 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
           </div>
 
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-            {useWebcam && (
-              <RealtimeWebcam
-                isStreaming={isStreaming}
-                onFrame={sendFrame}
-                onLipMovementChange={(active) => setHasLipMovement(active)}
-              />
-            )}
+            {useWebcam && <RealtimeWebcam isStreaming={isStreaming} onFrame={sendFrame} />}
             {useWebcam && (
               <div>
                 <p className={styles.smallNote}>Live Lip Contour (Cropped)</p>
@@ -235,20 +199,7 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
               </div>
             )}
           </div>
-          {useMic && (
-            <RealtimeAudio
-              isStreaming={isStreaming}
-              onAudio={sendAudio}
-              onSoundActivityChange={(active) => setHasSound(active)}
-            />
-          )}
-
-          {isStreaming && useMic && !hasSound && (
-            <p className={styles.activityWarning}>No sound detected</p>
-          )}
-          {isStreaming && useWebcam && !hasLipMovement && (
-            <p className={styles.activityWarning}>No lip movement detected</p>
-          )}
+          {useMic && <RealtimeAudio isStreaming={isStreaming} onAudio={sendAudio} />}
 
           {enableUploadVideoAudioOnly && (
             <div className={styles.uploadOnlyCard}>
@@ -284,9 +235,6 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
             {mode === 'asr_only' ? 'Live ASR Output' : 'Live Transcription'}
           </h4>
           <div className={styles.liveOutput}>
-            {isPredictionPaused && (
-              <p className={styles.activityPaused}>Prediction paused until speech activity is detected.</p>
-            )}
             {live ? (
               <>
                 <p className={styles.livePrediction}>{live.prediction}</p>
