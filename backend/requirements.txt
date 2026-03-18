@@ -1,4 +1,6 @@
-flask
+fastapi==0.135.1
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
 torch
 torchaudio
 opencv-python
@@ -6,4 +8,6 @@ ffmpeg-python
 numpy
 pydub
 transformers
-mediapipe
+mediapipe==0.10.5
+python-dotenv==1.0.0
+Pillow==10.1.0

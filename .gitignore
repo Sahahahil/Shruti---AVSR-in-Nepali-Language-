@@ -1,10 +1,39 @@
+# Python environments and caches
 projectvenv/
+backend/venv/
+**/__pycache__/
+*.py[cod]
+
+# Node/Next build artifacts (workspace-level)
+frontend/node_modules/
+frontend/nepali-avsr-frontend/node_modules/
+frontend/nepali-avsr-frontend/.next/
+
+# Runtime/generated backend folders
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/processed/*
+!backend/processed/.gitkeep
+
+# Trained model weights and checkpoints (keep local, do not commit)
+backend/audio_model/
+backend/video_model/*.pth
+backend/video_model/**/*.pth
+backend/audio_model/**/*.bin
+backend/audio_model/**/*.safetensors
+backend/audio_model/**/*.pt
+backend/audio_model/**/*.pth
+backend/audio_model/**/checkpoint-*/
+
+# Legacy local model artifacts
 MajorProject/
 nep-2/wav2vec2-nepali-finetuned-v1/
 nep-2/wav2vec2-nepali-finetuned-v2/
 nep-2/ne_np_female/
 nep-2/tokenizer/
 nep-2/wav2vec2-nepali-processor/
-nep-2/ne_np_female/
-D:/
-backend/venv/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.swp

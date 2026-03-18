@@ -1,0 +1,254 @@
+// Tab Content Module SCSS
+
+$primary: #6366f1;
+$secondary: #ec4899;
+$surface: #1e293b;
+$surface-light: #334155;
+$text-primary: #f1f5f9;
+$text-secondary: #cbd5e1;
+$border-color: #475569;
+$error: #ef4444;
+
+.tabContent {
+  width: 100%;
+}
+
+.realtimePanel {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.leftColumn,
+.rightColumn {
+  min-width: 0;
+}
+
+.card {
+  background: $surface;
+  border: 1px solid $border-color;
+  border-radius: 1rem;
+  padding: 1.25rem;
+}
+
+.sectionTitle {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem;
+  color: $text-primary;
+}
+
+.sectionDescription {
+  color: $text-secondary;
+  font-size: 0.95rem;
+  margin: 0 0 1rem;
+  line-height: 1.6;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.startBtn,
+.stopBtn {
+  border: 0;
+  border-radius: 0.7rem;
+  padding: 0.6rem 1rem;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.startBtn {
+  background: linear-gradient(135deg, #0ea5e9, #0284c7);
+}
+
+.stopBtn {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.statusBadge {
+  text-transform: uppercase;
+  font-size: 0.74rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 0.45rem;
+  color: white;
+  background: #64748b;
+
+  &[data-state='connected'] {
+    background: #16a34a;
+  }
+
+  &[data-state='connecting'] {
+    background: #f59e0b;
+  }
+
+  &[data-state='error'] {
+    background: #ef4444;
+  }
+}
+
+.webcamWrap {
+  margin-top: 0.8rem;
+  position: relative;
+  border-radius: 0.8rem;
+  overflow: hidden;
+  border: 1px solid $border-color;
+}
+
+.webcamVideo {
+  width: 100%;
+  display: block;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: #0f172a;
+}
+
+.webcamOverlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #f8fafc;
+  background: rgba(15, 23, 42, 0.62);
+  font-weight: 700;
+}
+
+.audioPanel {
+  margin-top: 0.9rem;
+  border: 1px solid $border-color;
+  border-radius: 0.8rem;
+  padding: 0.8rem;
+}
+
+.audioLabel {
+  color: $text-secondary;
+  font-size: 0.85rem;
+  margin-bottom: 0.45rem;
+}
+
+.audioBar {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: $surface-light;
+}
+
+.audioFill {
+  height: 100%;
+  background: linear-gradient(90deg, #22c55e, #10b981);
+  transition: width 0.08s linear;
+}
+
+.featuresTitle {
+  font-size: 1rem;
+  margin: 0 0 0.7rem;
+  color: $text-primary;
+}
+
+.liveOutput {
+  border: 1px solid $border-color;
+  border-radius: 0.8rem;
+  padding: 0.9rem;
+  margin-bottom: 1rem;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.livePrediction {
+  font-size: 2rem;
+  margin: 0 0 0.3rem;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.smallNote {
+  font-size: 0.84rem;
+  color: $text-secondary;
+  margin: 0.35rem 0;
+}
+
+.activityWarning {
+  margin-top: 0.7rem;
+  margin-bottom: 0;
+  font-size: 0.86rem;
+  color: #fca5a5;
+}
+
+.activityPaused {
+  margin: 0 0 0.7rem;
+  font-size: 0.86rem;
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+.breakdown {
+  margin-top: 0.6rem;
+  border-top: 1px solid $border-color;
+  padding-top: 0.6rem;
+
+  p {
+    margin: 0.2rem 0;
+    color: $text-secondary;
+    font-size: 0.86rem;
+  }
+}
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.historyItem {
+  display: flex;
+  justify-content: space-between;
+  border: 1px solid $border-color;
+  border-radius: 0.6rem;
+  padding: 0.6rem 0.7rem;
+  color: #e2e8f0;
+  font-size: 0.9rem;
+}
+
+.uploadOnlyCard {
+  margin-top: 1rem;
+  border: 1px solid rgba($primary, 0.5);
+  border-radius: 0.8rem;
+  padding: 0.85rem;
+  background: rgba($primary, 0.05);
+}
+
+.fileInput {
+  width: 100%;
+  margin-top: 0.5rem;
+  color: $text-secondary;
+}
+
+.uploadResult {
+  margin-top: 0.8rem;
+  border-top: 1px solid $border-color;
+  padding-top: 0.8rem;
+
+  p {
+    margin: 0.25rem 0;
+    color: #e2e8f0;
+    font-size: 0.9rem;
+  }
+}
+
+.errorBox {
+  margin-top: 1rem;
+  padding: 0.8rem;
+  border-radius: 0.7rem;
+  background: rgba($error, 0.12);
+  border: 1px solid rgba($error, 0.35);
+  color: #fecaca;
+}

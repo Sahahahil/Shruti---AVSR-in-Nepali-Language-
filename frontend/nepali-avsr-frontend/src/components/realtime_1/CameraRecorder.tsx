@@ -201,4 +201,6 @@ const CameraRecorder = forwardRef<RecorderHandle, Props>(({ isRecording }, ref) 
   );
 });
 
+CameraRecorder.displayName = 'CameraRecorder';
+
 export default CameraRecorder;

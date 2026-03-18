@@ -15,7 +15,7 @@ export default function AudioStream({ socket, isStreaming }: AudioStreamProps) {
     const bytes = new Uint8Array(buffer.buffer);
     const chunkSize = 0x8000;
     for (let i = 0; i < bytes.length; i += chunkSize) {
-      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize) as any);
+      binary += String.fromCharCode(...Array.from(bytes.subarray(i, i + chunkSize)));
     }
     return btoa(binary);
   };
