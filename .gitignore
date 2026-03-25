@@ -16,6 +16,7 @@ backend/processed/*
 !backend/processed/.gitkeep
 
 # Trained model weights and checkpoints (keep local, do not commit)
+*.pth
 backend/audio_model/
 backend/video_model/*.pth
 backend/video_model/**/*.pth
