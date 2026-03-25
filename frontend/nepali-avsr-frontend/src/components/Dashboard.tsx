@@ -8,7 +8,7 @@ import RealtimeVSR_ASR from './RealtimeVSR_ASR';
 import RealtimeASR_VideoInput from './RealtimeASR_VideoInput';
 import styles from '@/styles/dashboard.module.scss';
 
-type TabType = 'avsr' | 'vsr_asr' | 'asr_only';
+type TabType = 'avsr' | 'vsr_only' | 'asr_only';
 
 interface TabConfig {
   id: TabType;
@@ -20,20 +20,20 @@ interface TabConfig {
 const tabs: TabConfig[] = [
   {
     id: 'avsr',
-    label: 'Realtime AVSR',
-    description: 'Live webcam and microphone fusion transcription.',
+    label: 'AVSR',
+    description: 'Realtime AVSR plus uploaded video processing using audio + video fusion.',
     component: RealtimeAVSR,
   },
   {
-    id: 'vsr_asr',
-    label: 'Realtime VSR Only',
-    description: 'Live webcam lip-reading without microphone input.',
+    id: 'vsr_only',
+    label: 'VSR Only',
+    description: 'Realtime lip-reading plus uploaded video processing using video only.',
     component: RealtimeVSR_ASR,
   },
   {
     id: 'asr_only',
-    label: 'ASR + Video Upload',
-    description: 'Live microphone ASR plus video+audio upload processed as audio-only.',
+    label: 'ASR Only',
+    description: 'Realtime audio recognition plus uploaded video processing using audio only.',
     component: RealtimeASR_VideoInput,
   },
 ];

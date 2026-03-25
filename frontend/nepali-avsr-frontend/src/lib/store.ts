@@ -17,7 +17,7 @@ interface ProcessingState {
   uploadProgress: number;
   error: string | null;
   result: TranscriptionResult | null;
-  currentTab: 'avsr' | 'vsr_asr' | 'asr_only';
+  currentTab: 'avsr' | 'vsr_only' | 'asr_only';
 }
 
 interface AppStore extends ProcessingState {
@@ -25,7 +25,7 @@ interface AppStore extends ProcessingState {
   setProgress: (progress: number) => void;
   setError: (error: string | null) => void;
   setResult: (result: TranscriptionResult | null) => void;
-  setCurrentTab: (tab: 'avsr' | 'vsr_asr' | 'asr_only') => void;
+  setCurrentTab: (tab: 'avsr' | 'vsr_only' | 'asr_only') => void;
   reset: () => void;
 }
 

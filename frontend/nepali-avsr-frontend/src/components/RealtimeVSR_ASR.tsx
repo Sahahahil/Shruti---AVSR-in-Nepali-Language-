@@ -7,10 +7,11 @@ const RealtimeVSR_ASR: React.FC = () => {
   return (
     <RealtimeStreamPanel
       mode="vsr_only"
-      title="Realtime VSR Only"
-      description="Live webcam lip-reading without microphone input."
+      title="VSR Only"
+      description="Realtime webcam lip-reading with uploaded video VSR support."
       useWebcam
       useMic={false}
+      enableUploadVideoAudioOnly
     />
   );
 };

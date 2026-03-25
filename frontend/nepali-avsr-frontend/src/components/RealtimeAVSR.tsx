@@ -7,10 +7,11 @@ const RealtimeAVSR: React.FC = () => {
   return (
     <RealtimeStreamPanel
       mode="avsr"
-      title="Realtime AVSR"
-      description="Live webcam + microphone fusion transcription for Nepali speech."
+      title="AVSR"
+      description="Realtime webcam + microphone fusion with uploaded video AVSR support."
       useWebcam
       useMic
+      enableUploadVideoAudioOnly
     />
   );
 };

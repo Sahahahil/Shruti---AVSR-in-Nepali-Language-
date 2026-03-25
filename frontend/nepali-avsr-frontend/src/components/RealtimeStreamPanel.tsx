@@ -159,7 +159,12 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
     setUploading(true);
     setError(null);
     try {
-      const res = await apiClient.uploadForASR_Only(file);
+      const res = mode === 'avsr'
+        ? await apiClient.uploadForAVSR(file)
+        : mode === 'vsr_only'
+          ? await apiClient.uploadForVSR_Only(file)
+          : await apiClient.uploadForASR_Only(file);
+
       setUploadResult({
         transcription: res.transcription,
         confidence: res.confidence,
@@ -172,7 +177,7 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
       setUploading(false);
       event.target.value = '';
     }
-  }, []);
+  }, [mode]);
 
   return (
     <div className={styles.realtimePanel}>
@@ -203,9 +208,15 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
 
           {enableUploadVideoAudioOnly && (
             <div className={styles.uploadOnlyCard}>
-              <h4 className={styles.featuresTitle}>Video + Audio Input (Audio Processing)</h4>
+              <h4 className={styles.featuresTitle}>
+                {mode === 'avsr' ? 'Upload Video (AVSR)' : mode === 'vsr_only' ? 'Upload Video (VSR Only)' : 'Upload Video (ASR Only)'}
+              </h4>
               <p className={styles.sectionDescription}>
-                Upload a video file. The backend extracts audio and returns audio-only classification/transcription.
+                {mode === 'avsr'
+                  ? 'Upload a video file and run audio-visual fusion inference.'
+                  : mode === 'vsr_only'
+                    ? 'Upload a video file and run lip-reading (video-only) inference.'
+                    : 'Upload a video file. The backend extracts audio and returns audio-only inference.'}
               </p>
               <input
                 type="file"
@@ -232,7 +243,7 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
       <div className={styles.rightColumn}>
         <div className={styles.card}>
           <h4 className={styles.featuresTitle}>
-            {mode === 'asr_only' ? 'Live ASR Output' : 'Live Transcription'}
+            {mode === 'asr_only' ? 'Live ASR Output' : mode === 'vsr_only' ? 'Live VSR Output' : 'Live AVSR Output'}
           </h4>
           <div className={styles.liveOutput}>
             {live ? (

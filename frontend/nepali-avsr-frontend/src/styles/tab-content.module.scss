@@ -110,6 +110,7 @@ $error: #ef4444;
   aspect-ratio: 4 / 3;
   object-fit: cover;
   background: #0f172a;
+  transform: scaleX(-1);
 }
 
 .webcamOverlay {

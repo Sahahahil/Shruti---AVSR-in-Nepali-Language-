@@ -78,14 +78,14 @@ class APIClient {
   }
 
   /**
-   * Tab 2: Real-time VSR + ASR (Separated)
+   * Tab 2: VSR only (video input)
    */
-  async uploadForVSR_ASR(file: File, onProgress?: (progress: number) => void) {
+  async uploadForVSR_Only(file: File, onProgress?: (progress: number) => void) {
     try {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await this.axiosInstance.post('/api/vsr-asr/realtime', formData, {
+      const response = await this.axiosInstance.post('/api/vsr-only/video', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -100,14 +100,14 @@ class APIClient {
       return response.data;
     } catch (err) {
       if (err instanceof AxiosError) {
-        throw new Error(err.response?.data?.detail || 'VSR+ASR processing failed');
+        throw new Error(err.response?.data?.detail || 'VSR processing failed');
       }
       throw err;
     }
   }
 
   /**
-   * Tab 3: ASR Only (Video input, audio processing)
+   * Tab 3: ASR only (video input, audio processing)
    */
   async uploadForASR_Only(file: File, onProgress?: (progress: number) => void) {
     try {

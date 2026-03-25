@@ -1,4 +1,3 @@
-from collections import deque
 import base64
 import json
 import time
@@ -9,7 +8,7 @@ import numpy as np
 from fastapi import FastAPI, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from inference import transcribe_video
+from inference import RealtimeInferencer, transcribe_video
 
 
 app = FastAPI(
@@ -32,41 +31,29 @@ UPLOAD_FOLDER.mkdir(exist_ok=True)
 PROCESSED_FOLDER.mkdir(exist_ok=True)
 
 ALLOWED_EXTENSIONS = {'webm', 'mp4', 'webp', 'avi', 'mov'}
-CLASSES = ['अगाडि', 'जाऊ', 'तल', 'तिमी', 'दायाँ', 'पछाडि', 'बायाँ', 'माथि', 'रोक']
 
 
 class RealtimeState:
     def __init__(self) -> None:
         self.mode = 'avsr'
-        self.frame_scores = deque(maxlen=50)
-        self.audio_scores = deque(maxlen=50)
+        self.engine = RealtimeInferencer(audio_window_s=2.0)
         self.last_emit_t = 0.0
+        self.emit_interval_s = 0.45
 
     def set_mode(self, mode: str) -> None:
-        if mode in {'avsr', 'vsr_only', 'asr_only'}:
+        if mode in {'avsr', 'vsr_asr', 'vsr_only', 'asr_only'}:
             self.mode = mode
 
     def reset(self) -> None:
-        self.frame_scores.clear()
-        self.audio_scores.clear()
+        self.engine.reset()
         self.last_emit_t = 0.0
 
+    def close(self) -> None:
+        self.engine.close()
+
     def add_frame(self, frame_bgr: np.ndarray) -> dict | None:
-        gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
-        resized = cv2.resize(gray, (64, 64), interpolation=cv2.INTER_AREA)
-
-        # Deterministic live score from motion/brightness proxy
-        edge = cv2.Laplacian(resized, cv2.CV_64F).var()
-        mean_intensity = float(np.mean(resized))
-        frame_score = (edge * 0.7 + mean_intensity * 0.3) / 255.0
-        self.frame_scores.append(frame_score)
-
-        now = time.time()
-        if now - self.last_emit_t < 0.12 or len(self.frame_scores) < 5:
-            return None
-
-        self.last_emit_t = now
-        return self.predict()
+        self.engine.add_frame(frame_bgr)
+        return self._predict_if_ready()
 
     def add_audio(self, samples: list[float]) -> dict | None:
         if not samples:
@@ -76,66 +63,32 @@ class RealtimeState:
         if arr.size == 0:
             return None
 
-        rms = float(np.sqrt(np.mean(np.square(arr))))
-        peak = float(np.max(np.abs(arr)))
-        self.audio_scores.append(min(1.0, rms * 6.0 + peak * 0.2))
+        self.engine.add_audio(arr)
+        return self._predict_if_ready()
 
-        if self.mode == 'asr_only' and len(self.audio_scores) >= 4:
-            return self.predict()
+    def _predict_if_ready(self) -> dict | None:
+        now = time.time()
+        if now - self.last_emit_t < self.emit_interval_s:
+            return None
 
-        if self.mode == 'avsr' and len(self.audio_scores) >= 4 and len(self.frame_scores) >= 4:
-            return self.predict()
+        if self.mode == 'vsr_only' and not self.engine.has_vsr_context():
+            return None
 
-        return None
+        if self.mode == 'asr_only' and not self.engine.has_asr_context():
+            return None
 
-    def _score_to_idx_conf(self, score: float) -> tuple[int, float]:
-        idx = int(min(len(CLASSES) - 1, max(0, round(score * (len(CLASSES) - 1)))))
-        confidence = float(min(0.98, max(0.35, 0.45 + score * 0.5)))
-        return idx, confidence
+        if self.mode in {'avsr', 'vsr_asr'} and not (self.engine.has_vsr_context() and self.engine.has_asr_context()):
+            return None
 
-    def predict(self) -> dict:
-        vsr_score = float(np.mean(self.frame_scores)) if self.frame_scores else 0.0
-        asr_score = float(np.mean(self.audio_scores)) if self.audio_scores else 0.0
-
-        v_idx, v_conf = self._score_to_idx_conf(vsr_score)
-        a_idx, a_conf = self._score_to_idx_conf(asr_score)
-
-        if self.mode == 'vsr_only':
-            return {
-                'type': 'prediction',
-                'mode': 'vsr_only',
-                'prediction': CLASSES[v_idx],
-                'confidence': v_conf,
-                'latency': 120,
-                'vsr_prediction': CLASSES[v_idx],
-                'vsr_confidence': v_conf,
-            }
-
-        if self.mode == 'asr_only':
-            return {
-                'type': 'prediction',
-                'mode': 'asr_only',
-                'prediction': CLASSES[a_idx],
-                'confidence': a_conf,
-                'latency': 120,
-                'asr_prediction': CLASSES[a_idx],
-                'asr_confidence': a_conf,
-            }
-
-        # AVSR fusion
-        fusion_score = 0.6 * vsr_score + 0.4 * asr_score
-        f_idx, f_conf = self._score_to_idx_conf(fusion_score)
-        return {
+        self.last_emit_t = now
+        t0 = time.time()
+        pred = self.engine.predict(self.mode)
+        pred.update({
             'type': 'prediction',
-            'mode': 'avsr',
-            'prediction': CLASSES[f_idx],
-            'confidence': f_conf,
-            'latency': 150,
-            'vsr_prediction': CLASSES[v_idx],
-            'vsr_confidence': v_conf,
-            'asr_prediction': CLASSES[a_idx],
-            'asr_confidence': a_conf,
-        }
+            'mode': self.mode,
+            'latency': int((time.time() - t0) * 1000),
+        })
+        return pred
 
 
 def allowed_file(filename: str) -> bool:
@@ -207,6 +160,36 @@ async def vsr_asr_realtime(file: UploadFile = File(...)):
             file_path.unlink()
 
 
+@app.post('/api/vsr-only/video')
+async def vsr_only_video(file: UploadFile = File(...)):
+    file_path = None
+    try:
+        if not file.filename or not allowed_file(file.filename):
+            raise HTTPException(
+                status_code=400,
+                detail=f"File type not allowed. Allowed: {', '.join(ALLOWED_EXTENSIONS)}",
+            )
+
+        file_path = UPLOAD_FOLDER / file.filename
+        with open(file_path, 'wb') as f:
+            f.write(await file.read())
+
+        result = transcribe_video(str(file_path), mode='vsr_only')
+        return {
+            'status': 'success',
+            'mode': 'VSR Only (Video Input)',
+            'transcription': result.get('transcription', ''),
+            'confidence': result.get('confidence', 0.0),
+            'processing_time': result.get('processing_time', 0.0),
+            'classification': result.get('classification', result.get('transcription', '')),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if file_path and file_path.exists():
+            file_path.unlink()
+
+
 @app.post('/api/asr-only/video')
 async def asr_only_video(file: UploadFile = File(...)):
     file_path = None
@@ -240,20 +223,23 @@ async def asr_only_video(file: UploadFile = File(...)):
 @app.websocket('/ws/realtime')
 async def realtime_ws(websocket: WebSocket):
     await websocket.accept()
-    state = RealtimeState()
+    state: RealtimeState | None = None
 
     try:
+        state = RealtimeState()
         while True:
             text = await websocket.receive_text()
             msg = json.loads(text)
             msg_type = msg.get('type')
 
             if msg_type == 'config':
-                state.set_mode(msg.get('mode', 'avsr'))
+                if state is not None:
+                    state.set_mode(msg.get('mode', 'avsr'))
                 continue
 
             if msg_type == 'reset':
-                state.reset()
+                if state is not None:
+                    state.reset()
                 continue
 
             if msg_type == 'frame':
@@ -267,12 +253,21 @@ async def realtime_ws(websocket: WebSocket):
                 if frame is None:
                     continue
 
+                # Keep realtime processing in selfie orientation to match frontend preview.
+                frame = cv2.flip(frame, 1)
+
+                if state is None:
+                    continue
+
                 out = state.add_frame(frame)
                 if out is not None:
                     await websocket.send_text(json.dumps(out, ensure_ascii=False))
                 continue
 
             if msg_type == 'audio':
+                if state is None:
+                    continue
+
                 out = state.add_audio(msg.get('data', []))
                 if out is not None:
                     await websocket.send_text(json.dumps(out, ensure_ascii=False))
@@ -280,12 +275,15 @@ async def realtime_ws(websocket: WebSocket):
 
     except WebSocketDisconnect:
         return
+    finally:
+        if state is not None:
+            state.close()
 
 
 @app.get('/api/config')
 async def get_config():
     return {
-        'supported_tabs': ['realtime_avsr', 'realtime_vsr_only', 'asr_only_plus_video_audio_input'],
+        'supported_tabs': ['avsr', 'vsr_only', 'asr_only'],
         'allowed_formats': list(ALLOWED_EXTENSIONS),
         'max_file_size_mb': 100,
         'language': 'Nepali',
