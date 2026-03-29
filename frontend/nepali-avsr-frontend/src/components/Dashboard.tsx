@@ -4,11 +4,15 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore } from '@/lib/store';
 import RealtimeAVSR from './RealtimeAVSR';
-import RealtimeVSR_ASR from './RealtimeVSR_ASR';
-import RealtimeASR_VideoInput from './RealtimeASR_VideoInput';
+// import RealtimeVSR_ASR from './RealtimeVSR_ASR';
+// import RealtimeASR_VideoInput from './RealtimeASR_VideoInput';
 import styles from '@/styles/dashboard.module.scss';
 
-type TabType = 'avsr' | 'vsr_only' | 'asr_only';
+type TabType =
+  | 'avsr'
+  // | 'vsr_only'
+  // | 'asr_only'
+  ;
 
 interface TabConfig {
   id: TabType;
@@ -21,21 +25,21 @@ const tabs: TabConfig[] = [
   {
     id: 'avsr',
     label: 'AVSR',
-    description: 'Realtime AVSR plus uploaded video processing using audio + video fusion.',
+    description: 'Realtime AVSR using live webcam and microphone fusion.',
     component: RealtimeAVSR,
   },
-  {
-    id: 'vsr_only',
-    label: 'VSR Only',
-    description: 'Realtime lip-reading plus uploaded video processing using video only.',
-    component: RealtimeVSR_ASR,
-  },
-  {
-    id: 'asr_only',
-    label: 'ASR Only',
-    description: 'Realtime audio recognition plus uploaded video processing using audio only.',
-    component: RealtimeASR_VideoInput,
-  },
+  // {
+  //   id: 'vsr_only',
+  //   label: 'VSR Only',
+  //   description: 'Realtime lip-reading plus uploaded video processing using video only.',
+  //   component: RealtimeVSR_ASR,
+  // },
+  // {
+  //   id: 'asr_only',
+  //   label: 'ASR Only',
+  //   description: 'Realtime audio recognition plus uploaded video processing using audio only.',
+  //   component: RealtimeASR_VideoInput,
+  // },
 ];
 
 const Dashboard: React.FC = () => {

@@ -8,10 +8,9 @@ const RealtimeAVSR: React.FC = () => {
     <RealtimeStreamPanel
       mode="avsr"
       title="AVSR"
-      description="Realtime webcam + microphone fusion with uploaded video AVSR support."
+      description="Realtime webcam + microphone fusion."
       useWebcam
       useMic
-      enableUploadVideoAudioOnly
     />
   );
 };

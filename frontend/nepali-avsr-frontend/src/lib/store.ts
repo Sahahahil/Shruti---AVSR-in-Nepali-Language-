@@ -12,12 +12,17 @@ interface TranscriptionResult {
   status?: string;
 }
 
+type CurrentTab =
+  | 'avsr';
+// | 'vsr_only';
+// | 'asr_only';
+
 interface ProcessingState {
   isLoading: boolean;
   uploadProgress: number;
   error: string | null;
   result: TranscriptionResult | null;
-  currentTab: 'avsr' | 'vsr_only' | 'asr_only';
+  currentTab: CurrentTab;
 }
 
 interface AppStore extends ProcessingState {
@@ -25,7 +30,7 @@ interface AppStore extends ProcessingState {
   setProgress: (progress: number) => void;
   setError: (error: string | null) => void;
   setResult: (result: TranscriptionResult | null) => void;
-  setCurrentTab: (tab: 'avsr' | 'vsr_only' | 'asr_only') => void;
+  setCurrentTab: (tab: CurrentTab) => void;
   reset: () => void;
 }
 
