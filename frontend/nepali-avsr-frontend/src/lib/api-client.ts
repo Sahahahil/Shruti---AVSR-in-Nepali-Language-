@@ -2,6 +2,14 @@ import axios, { AxiosInstance, AxiosError } from 'axios';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+export interface FusionOptions {
+  fusion_mode?: 'confidence' | 'weighted' | 'hybrid';
+  vsr_weight?: number;
+  asr_weight?: number;
+  vsr_temp?: number;
+  asr_temp?: number;
+}
+
 class APIClient {
   private axiosInstance: AxiosInstance;
 
@@ -51,7 +59,11 @@ class APIClient {
   /**
    * Tab 1: Real-time AVSR (Audio + Video fusion)
    */
-  async uploadForAVSR(file: File, onProgress?: (progress: number) => void) {
+  async uploadForAVSR(
+    file: File,
+    onProgress?: (progress: number) => void,
+    fusion?: FusionOptions
+  ) {
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -60,6 +72,7 @@ class APIClient {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        params: fusion,
         onUploadProgress: (progressEvent) => {
           if (onProgress && progressEvent.total) {
             const progress = Math.round((progressEvent.loaded / progressEvent.total) * 100);

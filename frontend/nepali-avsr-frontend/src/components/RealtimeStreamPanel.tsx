@@ -6,6 +6,7 @@ import RealtimeAudio from './RealtimeAudio';
 import RealtimeWebcam from './RealtimeWebcam';
 import LipContourVisualizer from './LipContourVisualizer';
 import styles from '@/styles/tab-content.module.scss';
+import { FusionOptions } from '@/lib/api-client';
 
 type WsMode = 'avsr' | 'vsr_only' | 'asr_only';
 
@@ -27,6 +28,14 @@ interface RealtimeStreamPanelProps {
   useMic: boolean;
   enableUploadVideoAudioOnly?: boolean;
 }
+
+const DEFAULT_BALANCED_FUSION: FusionOptions = {
+  fusion_mode: 'weighted',
+  vsr_weight: 0.1,
+  asr_weight: 0.9,
+  vsr_temp: 3.0,
+  asr_temp: 0.3,
+};
 
 const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
   mode,
@@ -87,7 +96,13 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
     ws.onopen = () => {
       setStatus('connected');
       setIsStreaming(true);
-      ws.send(JSON.stringify({ type: 'config', mode }));
+      ws.send(
+        JSON.stringify({
+          type: 'config',
+          mode,
+          ...DEFAULT_BALANCED_FUSION,
+        })
+      );
     };
 
     ws.onmessage = (event) => {
@@ -160,7 +175,7 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
     setError(null);
     try {
       const res = mode === 'avsr'
-        ? await apiClient.uploadForAVSR(file)
+        ? await apiClient.uploadForAVSR(file, undefined, DEFAULT_BALANCED_FUSION)
         : mode === 'vsr_only'
           ? await apiClient.uploadForVSR_Only(file)
           : await apiClient.uploadForASR_Only(file);

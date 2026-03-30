@@ -38,15 +38,18 @@ LIP_PAD_Y = 15
 LIP_ASPECT_RATIO = 2.0
 
 # Fusion calibration and balancing knobs.
-FUSION_MODE = 'hybrid'  # options: confidence, weighted, hybrid
-VSR_WEIGHT = 0.25
-ASR_WEIGHT = 0.75
+# Defaulted to the ASR-prior settings that performed best in manual runs.
+FUSION_MODE = 'weighted'  # options: confidence, weighted, hybrid
+VSR_WEIGHT = 0.10
+ASR_WEIGHT = 0.90
 CONFIDENCE_BLEND = 0.25
-VSR_TEMPERATURE = 1.35
-ASR_TEMPERATURE = 0.75
+VSR_TEMPERATURE = 3.0
+ASR_TEMPERATURE = 0.3
 MIN_MODALITY_WEIGHT = 0.10
 MAX_VSR_WEIGHT = 0.35
 VSR_FUSION_FLOOR = 0.20
+ASR_INFORMATIVE_FLOOR = 0.14
+ASR_DISAGREE_WEIGHT = 0.97
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -306,6 +309,12 @@ class RealtimeInferencer:
         self.audio_buffer: deque[np.ndarray] = deque()
         self.audio_samples = 0
 
+        self.fusion_mode = FUSION_MODE
+        self.vsr_weight = VSR_WEIGHT
+        self.asr_weight = ASR_WEIGHT
+        self.vsr_temperature = VSR_TEMPERATURE
+        self.asr_temperature = ASR_TEMPERATURE
+
     def reset(self) -> None:
         self.frame_buffer.clear()
         self.audio_buffer.clear()
@@ -313,6 +322,29 @@ class RealtimeInferencer:
 
     def close(self) -> None:
         self.face_mesh.close()
+
+    def set_fusion(
+        self,
+        mode: str | None = None,
+        vsr_weight: float | None = None,
+        asr_weight: float | None = None,
+        vsr_temperature: float | None = None,
+        asr_temperature: float | None = None,
+    ) -> None:
+        if mode in {'confidence', 'weighted', 'hybrid'}:
+            self.fusion_mode = mode
+
+        if vsr_weight is not None and np.isfinite(vsr_weight):
+            self.vsr_weight = float(np.clip(vsr_weight, 0.0, 1.0))
+
+        if asr_weight is not None and np.isfinite(asr_weight):
+            self.asr_weight = float(np.clip(asr_weight, 0.0, 1.0))
+
+        if vsr_temperature is not None and np.isfinite(vsr_temperature):
+            self.vsr_temperature = float(max(vsr_temperature, 1e-3))
+
+        if asr_temperature is not None and np.isfinite(asr_temperature):
+            self.asr_temperature = float(max(asr_temperature, 1e-3))
 
     def add_frame(self, frame_bgr: np.ndarray) -> None:
         lip_tensor = _extract_lip_tensor_from_frame(frame_bgr, self.face_mesh)
@@ -396,7 +428,15 @@ class RealtimeInferencer:
                 'asr_confidence': asr_conf,
             }
 
-        fused_probs, _, _ = _fuse(vsr_probs, asr_probs)
+        fused_probs, _, _ = _fuse(
+            vsr_probs,
+            asr_probs,
+            mode=self.fusion_mode,
+            vsr_weight=self.vsr_weight,
+            asr_weight=self.asr_weight,
+            vsr_temperature=self.vsr_temperature,
+            asr_temperature=self.asr_temperature,
+        )
         fused_idx = int(np.argmax(fused_probs))
         fused_conf = float(np.max(fused_probs))
         return {
@@ -499,9 +539,17 @@ def _apply_temperature(probs: np.ndarray, temperature: float) -> np.ndarray:
     return F.softmax(torch.from_numpy(scaled), dim=-1).cpu().numpy()
 
 
-def _fuse(vsr_probs: np.ndarray, asr_probs: np.ndarray, mode: str = FUSION_MODE) -> tuple[np.ndarray, float, float]:
-    vsr_cal = _apply_temperature(vsr_probs, VSR_TEMPERATURE)
-    asr_cal = _apply_temperature(asr_probs, ASR_TEMPERATURE)
+def _fuse(
+    vsr_probs: np.ndarray,
+    asr_probs: np.ndarray,
+    mode: str = FUSION_MODE,
+    vsr_weight: float = VSR_WEIGHT,
+    asr_weight: float = ASR_WEIGHT,
+    vsr_temperature: float = VSR_TEMPERATURE,
+    asr_temperature: float = ASR_TEMPERATURE,
+) -> tuple[np.ndarray, float, float]:
+    vsr_cal = _apply_temperature(vsr_probs, vsr_temperature)
+    asr_cal = _apply_temperature(asr_probs, asr_temperature)
 
     vsr_conf = float(np.max(vsr_cal))
     asr_conf = float(np.max(asr_cal))
@@ -510,15 +558,19 @@ def _fuse(vsr_probs: np.ndarray, asr_probs: np.ndarray, mode: str = FUSION_MODE)
     conf_w_asr = asr_conf / total
 
     if mode == 'weighted':
-        w_vsr = VSR_WEIGHT
-        w_asr = ASR_WEIGHT
+        prior_total = max(vsr_weight + asr_weight, 1e-8)
+        w_vsr = vsr_weight / prior_total
+        w_asr = asr_weight / prior_total
     elif mode == 'confidence':
         w_vsr = conf_w_vsr
         w_asr = conf_w_asr
     else:
         # Hybrid mode: blend confidence-driven weights with prior modality weights.
-        w_vsr = CONFIDENCE_BLEND * conf_w_vsr + (1.0 - CONFIDENCE_BLEND) * VSR_WEIGHT
-        w_asr = CONFIDENCE_BLEND * conf_w_asr + (1.0 - CONFIDENCE_BLEND) * ASR_WEIGHT
+        prior_total = max(vsr_weight + asr_weight, 1e-8)
+        prior_w_vsr = vsr_weight / prior_total
+        prior_w_asr = asr_weight / prior_total
+        w_vsr = CONFIDENCE_BLEND * conf_w_vsr + (1.0 - CONFIDENCE_BLEND) * prior_w_vsr
+        w_asr = CONFIDENCE_BLEND * conf_w_asr + (1.0 - CONFIDENCE_BLEND) * prior_w_asr
 
     # Bound per-modality contribution and cap VSR to prioritize ASR.
     w_vsr = float(np.clip(w_vsr, MIN_MODALITY_WEIGHT, 1.0 - MIN_MODALITY_WEIGHT))
@@ -526,6 +578,15 @@ def _fuse(vsr_probs: np.ndarray, asr_probs: np.ndarray, mode: str = FUSION_MODE)
     w_asr = 1.0 - w_vsr
 
     fused = w_vsr * vsr_cal + w_asr * asr_cal
+
+    # Guardrail: if modalities disagree and ASR is at least mildly informative,
+    # strongly favor ASR to avoid pathological overconfident VSR dominance.
+    vsr_top = int(np.argmax(vsr_cal))
+    asr_top = int(np.argmax(asr_cal))
+    if vsr_top != asr_top and asr_conf >= ASR_INFORMATIVE_FLOOR:
+        w_asr = ASR_DISAGREE_WEIGHT
+        w_vsr = 1.0 - w_asr
+        fused = w_vsr * vsr_cal + w_asr * asr_cal
 
     # If VSR is too weak, let ASR take over fully.
     if vsr_conf < VSR_FUSION_FLOOR:
@@ -536,7 +597,15 @@ def _fuse(vsr_probs: np.ndarray, asr_probs: np.ndarray, mode: str = FUSION_MODE)
     return fused, w_vsr, w_asr
 
 
-def transcribe_video(video_path: str, mode: str = 'avsr') -> dict:
+def transcribe_video(
+    video_path: str,
+    mode: str = 'avsr',
+    fusion_mode: str = FUSION_MODE,
+    vsr_weight: float = VSR_WEIGHT,
+    asr_weight: float = ASR_WEIGHT,
+    vsr_temperature: float = VSR_TEMPERATURE,
+    asr_temperature: float = ASR_TEMPERATURE,
+) -> dict:
     start_time = time.time()
     base_name = os.path.splitext(os.path.basename(video_path))[0]
     audio_path = os.path.join('processed', f'{base_name}.wav')
@@ -588,7 +657,15 @@ def transcribe_video(video_path: str, mode: str = 'avsr') -> dict:
                 'mode': 'VSR+ASR',
             }
 
-        fused_probs, _, _ = _fuse(vsr_probs, asr_probs)
+        fused_probs, _, _ = _fuse(
+            vsr_probs,
+            asr_probs,
+            mode=fusion_mode,
+            vsr_weight=vsr_weight,
+            asr_weight=asr_weight,
+            vsr_temperature=vsr_temperature,
+            asr_temperature=asr_temperature,
+        )
         fused_idx = int(np.argmax(fused_probs))
         fused_conf = float(np.max(fused_probs))
 

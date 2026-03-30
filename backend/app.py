@@ -2,13 +2,22 @@ import base64
 import json
 import time
 from pathlib import Path
+from typing import Any
 
 import cv2
 import numpy as np
-from fastapi import FastAPI, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, UploadFile, File, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from inference import RealtimeInferencer, transcribe_video
+from inference import (
+    ASR_TEMPERATURE,
+    ASR_WEIGHT,
+    FUSION_MODE,
+    RealtimeInferencer,
+    VSR_TEMPERATURE,
+    VSR_WEIGHT,
+    transcribe_video,
+)
 
 
 app = FastAPI(
@@ -43,6 +52,22 @@ class RealtimeState:
     def set_mode(self, mode: str) -> None:
         if mode in {'avsr', 'vsr_asr', 'vsr_only', 'asr_only'}:
             self.mode = mode
+
+    def set_fusion(
+        self,
+        fusion_mode: str | None = None,
+        vsr_weight: float | None = None,
+        asr_weight: float | None = None,
+        vsr_temp: float | None = None,
+        asr_temp: float | None = None,
+    ) -> None:
+        self.engine.set_fusion(
+            mode=fusion_mode,
+            vsr_weight=vsr_weight,
+            asr_weight=asr_weight,
+            vsr_temperature=vsr_temp,
+            asr_temperature=asr_temp,
+        )
 
     def reset(self) -> None:
         self.engine.reset()
@@ -95,13 +120,32 @@ def allowed_file(filename: str) -> bool:
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def _as_float(val: Any) -> float | None:
+    if val is None:
+        return None
+    try:
+        parsed = float(val)
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(parsed):
+        return None
+    return parsed
+
+
 @app.get('/health')
 async def health_check():
     return {'status': 'healthy', 'service': 'Nepali AVSR Backend'}
 
 
 @app.post('/api/avsr/realtime')
-async def avsr_realtime(file: UploadFile = File(...)):
+async def avsr_realtime(
+    file: UploadFile = File(...),
+    fusion_mode: str = Query(default=FUSION_MODE),
+    vsr_weight: float = Query(default=VSR_WEIGHT, ge=0.0, le=1.0),
+    asr_weight: float = Query(default=ASR_WEIGHT, ge=0.0, le=1.0),
+    vsr_temp: float = Query(default=VSR_TEMPERATURE, gt=0.0),
+    asr_temp: float = Query(default=ASR_TEMPERATURE, gt=0.0),
+):
     file_path = None
     try:
         if not file.filename or not allowed_file(file.filename):
@@ -114,13 +158,28 @@ async def avsr_realtime(file: UploadFile = File(...)):
         with open(file_path, 'wb') as f:
             f.write(await file.read())
 
-        result = transcribe_video(str(file_path), mode='avsr')
+        result = transcribe_video(
+            str(file_path),
+            mode='avsr',
+            fusion_mode=fusion_mode,
+            vsr_weight=vsr_weight,
+            asr_weight=asr_weight,
+            vsr_temperature=vsr_temp,
+            asr_temperature=asr_temp,
+        )
         return {
             'status': 'success',
             'mode': 'AVSR (Audio + Video)',
             'transcription': result.get('transcription', ''),
             'confidence': result.get('confidence', 0.0),
             'processing_time': result.get('processing_time', 0.0),
+            'fusion': {
+                'mode': fusion_mode,
+                'vsr_weight': vsr_weight,
+                'asr_weight': asr_weight,
+                'vsr_temp': vsr_temp,
+                'asr_temp': asr_temp,
+            },
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -235,6 +294,13 @@ async def realtime_ws(websocket: WebSocket):
             if msg_type == 'config':
                 if state is not None:
                     state.set_mode(msg.get('mode', 'avsr'))
+                    state.set_fusion(
+                        fusion_mode=msg.get('fusion_mode'),
+                        vsr_weight=_as_float(msg.get('vsr_weight')),
+                        asr_weight=_as_float(msg.get('asr_weight')),
+                        vsr_temp=_as_float(msg.get('vsr_temp')),
+                        asr_temp=_as_float(msg.get('asr_temp')),
+                    )
                 continue
 
             if msg_type == 'reset':
@@ -287,6 +353,13 @@ async def get_config():
         'allowed_formats': list(ALLOWED_EXTENSIONS),
         'max_file_size_mb': 100,
         'language': 'Nepali',
+        'fusion_defaults': {
+            'mode': FUSION_MODE,
+            'vsr_weight': VSR_WEIGHT,
+            'asr_weight': ASR_WEIGHT,
+            'vsr_temp': VSR_TEMPERATURE,
+            'asr_temp': ASR_TEMPERATURE,
+        },
     }
 
 
