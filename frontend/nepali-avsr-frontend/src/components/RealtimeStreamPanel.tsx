@@ -30,6 +30,18 @@ interface RealtimeStreamPanelProps {
   enableUploadVideoAudioOnly?: boolean;
 }
 
+const TRAINED_WORD_CLASSES = [
+  '\u0905\u0917\u093e\u0921\u093f',
+  '\u091c\u093e\u090a',
+  '\u0924\u0932',
+  '\u0924\u093f\u092e\u0940',
+  '\u0926\u093e\u092f\u093e\u0901',
+  '\u092a\u091b\u093e\u0921\u093f',
+  '\u092c\u093e\u092f\u093e\u0901',
+  '\u092e\u093e\u0925\u093f',
+  '\u0930\u094b\u0915',
+];
+
 const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
   mode,
   title,
@@ -262,16 +274,31 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
             )}
           </div>
 
-          <h4 className={styles.featuresTitle}>Recent Predictions</h4>
-          <div className={styles.historyList}>
-            {history.length === 0 && <p className={styles.smallNote}>No predictions yet.</p>}
-            {history.map((item, idx) => (
-              <div className={styles.historyItem} key={`${item.prediction}-${idx}`}>
-                <span>{item.prediction}</span>
-                <span>{(item.confidence * 100).toFixed(1)}%</span>
+          {(mode === 'avsr' || mode === 'vsr_only') ? (
+            <>
+              <h4 className={styles.featuresTitle}>Trained Word Classes</h4>
+              <div className={styles.historyList}>
+                {TRAINED_WORD_CLASSES.map((word) => (
+                  <div className={styles.historyItem} key={word}>
+                    <span>{word}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          ) : (
+            <>
+              <h4 className={styles.featuresTitle}>Recent Predictions</h4>
+              <div className={styles.historyList}>
+                {history.length === 0 && <p className={styles.smallNote}>No predictions yet.</p>}
+                {history.map((item, idx) => (
+                  <div className={styles.historyItem} key={`${item.prediction}-${idx}`}>
+                    <span>{item.prediction}</span>
+                    <span>{(item.confidence * 100).toFixed(1)}%</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
