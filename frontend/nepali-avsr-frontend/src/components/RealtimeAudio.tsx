@@ -5,7 +5,7 @@ import styles from '@/styles/tab-content.module.scss';
 
 interface RealtimeAudioProps {
   isStreaming: boolean;
-  onAudio: (samples: Float32Array) => void;
+  onAudio: (samples: Float32Array, sampleRate: number) => void;
 }
 
 const RealtimeAudio: React.FC<RealtimeAudioProps> = ({ isStreaming, onAudio }) => {
@@ -57,7 +57,7 @@ const RealtimeAudio: React.FC<RealtimeAudioProps> = ({ isStreaming, onAudio }) =
             sum += Math.abs(samples[i]);
           }
           setLevel(Math.min(100, (sum / samples.length) * 600));
-          onAudio(samples);
+          onAudio(samples, audioContext.sampleRate);
         };
 
         source.connect(processor);

@@ -17,6 +17,8 @@ interface LivePrediction {
   vsr_confidence?: number;
   asr_prediction?: string;
   asr_confidence?: number;
+  vsr_weight?: number;
+  asr_weight?: number;
 }
 
 interface RealtimeStreamPanelProps {
@@ -105,6 +107,8 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
           vsr_confidence: msg.vsr_confidence,
           asr_prediction: msg.asr_prediction,
           asr_confidence: msg.asr_confidence,
+          vsr_weight: msg.vsr_weight,
+          asr_weight: msg.asr_weight,
         };
 
         setLive(pred);
@@ -137,7 +141,7 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
     wsRef.current.send(JSON.stringify({ type: 'frame', data: dataUrl }));
   }, [isStreaming, mode]);
 
-  const sendAudio = useCallback((samples: Float32Array) => {
+  const sendAudio = useCallback((samples: Float32Array, sampleRate: number) => {
     if (!isStreaming || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       return;
     }
@@ -147,7 +151,11 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
       return;
     }
 
-    wsRef.current.send(JSON.stringify({ type: 'audio', data: Array.from(samples) }));
+    wsRef.current.send(JSON.stringify({
+      type: 'audio',
+      data: Array.from(samples),
+      sample_rate: sampleRate,
+    }));
   }, [isStreaming]);
 
   const handleUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -244,6 +252,7 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
                   <div className={styles.breakdown}>
                     <p>VSR: {live.vsr_prediction || '-'} ({((live.vsr_confidence || 0) * 100).toFixed(1)}%)</p>
                     <p>ASR: {live.asr_prediction || '-'} ({((live.asr_confidence || 0) * 100).toFixed(1)}%)</p>
+                    <p>Fusion Weights: VSR {(live.vsr_weight ?? 0.3).toFixed(2)} | ASR {(live.asr_weight ?? 0.7).toFixed(2)}</p>
                   </div>
                 )}
               </>

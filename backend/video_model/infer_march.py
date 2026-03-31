@@ -21,7 +21,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-import pyaudio
 import threading
 import queue
 import argparse
@@ -31,6 +30,11 @@ from collections import deque, Counter
 import mediapipe as mp
 import torchaudio
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
+
+try:
+    import pyaudio
+except Exception:
+    pyaudio = None
 
 warnings.filterwarnings('ignore')
 
@@ -478,6 +482,8 @@ class ASREngine:
 
 class AudioCapture:
     def __init__(self, audio_queue: queue.Queue):
+        if pyaudio is None:
+            raise RuntimeError("PyAudio is required for local microphone capture in infer_march.py")
         self.queue   = audio_queue
         self.running = False
         self.pa      = pyaudio.PyAudio()
