@@ -176,6 +176,20 @@ $error: #ef4444;
   margin: 0.35rem 0;
 }
 
+.activityWarning {
+  margin-top: 0.7rem;
+  margin-bottom: 0;
+  font-size: 0.86rem;
+  color: #fca5a5;
+}
+
+.activityPaused {
+  margin: 0 0 0.7rem;
+  font-size: 0.86rem;
+  color: #fbbf24;
+  font-weight: 600;
+}
+
 .breakdown {
   margin-top: 0.6rem;
   border-top: 1px solid $border-color;

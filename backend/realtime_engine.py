@@ -23,6 +23,7 @@ PROCESSOR_PATH = (
     / "wav2vec2-nepali-processor-20260315T054231Z-1-001"
     / "wav2vec2-nepali-processor"
 )
+TRAIN_PROCESSOR_PATH = Path("/home/hasana/Models/wav2vec2-nepali-processor")
 
 
 class RealtimeModelRuntime:
@@ -32,12 +33,12 @@ class RealtimeModelRuntime:
 
     def __init__(self) -> None:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self._validate_required_paths()
+        self.processor_path = self._resolve_processor_path()
 
         Config.DEVICE = self.device
         Config.VSR_CHECKPOINT = str(VSR_CHECKPOINT_PATH)
         Config.WAV2VEC_PATH = str(WAV2VEC_PATH)
-        Config.WAV2VEC_PROCESSOR_PATH = str(PROCESSOR_PATH)
+        Config.WAV2VEC_PROCESSOR_PATH = str(self.processor_path)
 
         # Bias fusion towards ASR because ASR model quality is stronger.
         Config.FUSION_MODE = "weighted"
@@ -58,33 +59,16 @@ class RealtimeModelRuntime:
         )
         self.char_asr_engine = CharacterASREngine(
             wav2vec_path=Config.WAV2VEC_PATH,
-            processor_path=str(PROCESSOR_PATH),
+            processor_path=str(self.processor_path),
             device=self.device,
         )
 
     @staticmethod
-    def _validate_required_paths() -> None:
-        if not WAV2VEC_PATH.exists():
-            raise RuntimeError(
-                f"Wav2Vec2 checkpoint not found at {WAV2VEC_PATH}. ASR model is required."
-            )
-
-        if not PROCESSOR_PATH.exists():
-            raise RuntimeError(
-                f"Wav2Vec2 processor not found at {PROCESSOR_PATH}. "
-                "Tokenizer/processor files are required for ASR inference."
-            )
-
-        required_files = [
-            PROCESSOR_PATH / "vocab.json",
-            PROCESSOR_PATH / "tokenizer_config.json",
-            PROCESSOR_PATH / "preprocessor_config.json",
-        ]
-        missing = [str(p) for p in required_files if not p.exists()]
-        if missing:
-            raise RuntimeError(
-                "Wav2Vec2 processor is incomplete. Missing required files: " + ", ".join(missing)
-            )
+    def _resolve_processor_path() -> Path:
+        # Prefer the processor used during training if it exists.
+        if TRAIN_PROCESSOR_PATH.exists():
+            return TRAIN_PROCESSOR_PATH
+        return PROCESSOR_PATH
 
     @classmethod
     def get_instance(cls) -> RealtimeModelRuntime:
