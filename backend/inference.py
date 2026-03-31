@@ -540,6 +540,8 @@ def _apply_temperature(probs: np.ndarray, temperature: float) -> np.ndarray:
 
 
 def _fuse(
+    bias_asr = 2
+    bias_vsr = 1
     vsr_probs: np.ndarray,
     asr_probs: np.ndarray,
     mode: str = FUSION_MODE,
@@ -571,6 +573,15 @@ def _fuse(
         prior_w_asr = asr_weight / prior_total
         w_vsr = CONFIDENCE_BLEND * conf_w_vsr + (1.0 - CONFIDENCE_BLEND) * prior_w_vsr
         w_asr = CONFIDENCE_BLEND * conf_w_asr + (1.0 - CONFIDENCE_BLEND) * prior_w_asr
+
+        # apply bias
+        w_vsr *= bias_vsr
+        w_asr *= bias_asr
+
+        # renormalize
+        norm = w_vsr + w_asr + 1e-8
+        w_vsr /= norm
+        w_asr /= norm
 
     # Bound per-modality contribution and cap VSR to prioritize ASR.
     w_vsr = float(np.clip(w_vsr, MIN_MODALITY_WEIGHT, 1.0 - MIN_MODALITY_WEIGHT))
