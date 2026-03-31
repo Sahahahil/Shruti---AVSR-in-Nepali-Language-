@@ -7,9 +7,9 @@ const RealtimeASR_VideoInput: React.FC = () => {
   return (
     <RealtimeStreamPanel
       mode="asr_only"
-      title="Realtime ASR + Video Input"
-      description="Live microphone audio transcription. Video is displayed but only audio is processed by the backend."
-      useWebcam
+      title="ASR Only"
+      description="Live character-level wav2vec2 transcription from microphone audio (about every 2 seconds)."
+      useWebcam={false}
       useMic
       enableUploadVideoAudioOnly={false}
     />

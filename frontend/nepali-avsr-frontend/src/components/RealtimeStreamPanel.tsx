@@ -134,6 +134,7 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
     if (!isStreaming || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       return;
     }
+
     // Skip sending video frames in ASR-only mode (audio only)
     if (mode === 'asr_only') {
       return;

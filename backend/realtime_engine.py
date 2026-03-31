@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import torch
 import torch.nn.functional as F
+from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 
 from video_model.infer_march import ASREngine, CNN_LSTM_VSR, Config, LipDetector, fuse_predictions
 
@@ -31,6 +32,7 @@ class RealtimeModelRuntime:
 
     def __init__(self) -> None:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self._validate_required_paths()
 
         Config.DEVICE = self.device
         Config.VSR_CHECKPOINT = str(VSR_CHECKPOINT_PATH)
@@ -46,15 +48,43 @@ class RealtimeModelRuntime:
         Config.INFERENCE_EVERY_N_FRAMES = 1
         Config.AUDIO_WINDOW_S = 1.6
 
-        self.vsr_model, self.classes = self._load_vsr_model()
-        Config.CLASSES = self.classes
-        Config.NUM_CLASSES = len(self.classes)
+        self.vsr_model: CNN_LSTM_VSR | None = None
+        self.classes = list(Config.CLASSES)
 
         self.asr_engine = ASREngine(
             wav2vec_path=Config.WAV2VEC_PATH,
             device=self.device,
             processor_path=Config.WAV2VEC_PROCESSOR_PATH,
         )
+        self.char_asr_engine = CharacterASREngine(
+            wav2vec_path=Config.WAV2VEC_PATH,
+            processor_path=str(PROCESSOR_PATH),
+            device=self.device,
+        )
+
+    @staticmethod
+    def _validate_required_paths() -> None:
+        if not WAV2VEC_PATH.exists():
+            raise RuntimeError(
+                f"Wav2Vec2 checkpoint not found at {WAV2VEC_PATH}. ASR model is required."
+            )
+
+        if not PROCESSOR_PATH.exists():
+            raise RuntimeError(
+                f"Wav2Vec2 processor not found at {PROCESSOR_PATH}. "
+                "Tokenizer/processor files are required for ASR inference."
+            )
+
+        required_files = [
+            PROCESSOR_PATH / "vocab.json",
+            PROCESSOR_PATH / "tokenizer_config.json",
+            PROCESSOR_PATH / "preprocessor_config.json",
+        ]
+        missing = [str(p) for p in required_files if not p.exists()]
+        if missing:
+            raise RuntimeError(
+                "Wav2Vec2 processor is incomplete. Missing required files: " + ", ".join(missing)
+            )
 
     @classmethod
     def get_instance(cls) -> RealtimeModelRuntime:
@@ -80,6 +110,53 @@ class RealtimeModelRuntime:
         model.eval()
         return model, classes
 
+    def ensure_vsr_loaded(self) -> tuple[CNN_LSTM_VSR, list[str]]:
+        if self.vsr_model is None:
+            self.vsr_model, self.classes = self._load_vsr_model()
+            Config.CLASSES = self.classes
+            Config.NUM_CLASSES = len(self.classes)
+        return self.vsr_model, self.classes
+
+
+class CharacterASREngine:
+    """Character-level greedy CTC decoding from wav2vec2 checkpoint."""
+
+    def __init__(self, wav2vec_path: str, processor_path: str, device: str) -> None:
+        self.processor = Wav2Vec2Processor.from_pretrained(processor_path)
+        self.model = Wav2Vec2ForCTC.from_pretrained(wav2vec_path).to(device)
+        self.model.eval()
+        self.device = device
+
+    @torch.no_grad()
+    def transcribe(self, audio_np: np.ndarray) -> tuple[str, float]:
+        if audio_np.size == 0:
+            return "", 0.0
+
+        max_abs = float(np.max(np.abs(audio_np))) if audio_np.size else 0.0
+        if max_abs > 0:
+            audio_np = audio_np / max_abs
+
+        inputs = self.processor(
+            audio_np,
+            sampling_rate=Config.AUDIO_SR,
+            return_tensors="pt",
+            padding=True,
+        )
+        input_values = inputs.input_values.to(self.device)
+        attention_mask = None
+        if hasattr(inputs, "attention_mask") and inputs.attention_mask is not None:
+            attention_mask = inputs.attention_mask.to(self.device)
+
+        logits = self.model(input_values, attention_mask=attention_mask).logits
+        probs = F.softmax(logits, dim=-1)
+        pred_ids = torch.argmax(probs, dim=-1)
+
+        text = self.processor.batch_decode(pred_ids)[0].strip()
+
+        token_conf = torch.max(probs, dim=-1).values
+        confidence = float(token_conf.mean().item()) if token_conf.numel() else 0.0
+        return text, confidence
+
 
 class RealtimeSession:
     def __init__(self) -> None:
@@ -96,8 +173,9 @@ class RealtimeSession:
 
         self.last_vsr_t = 0.0
         self.last_asr_t = 0.0
+        self.last_asr_char_t = 0.0
 
-        self.lip_detector = LipDetector()
+        self.lip_detector: LipDetector | None = None
 
     def close(self) -> None:
         if self.lip_detector is not None:
@@ -106,6 +184,8 @@ class RealtimeSession:
     def set_mode(self, mode: str) -> None:
         if mode in {"avsr", "vsr_only", "asr_only"}:
             self.mode = mode
+            if mode in {"avsr", "vsr_only"}:
+                self._ensure_vsr_components()
 
     def reset(self) -> None:
         self.frame_buffer.clear()
@@ -115,9 +195,24 @@ class RealtimeSession:
         self.asr_probs = np.ones(n_classes, dtype=np.float32) / n_classes
         self.last_vsr_t = 0.0
         self.last_asr_t = 0.0
+        self.last_asr_char_t = 0.0
+
+    def _ensure_vsr_components(self) -> None:
+        _, classes = self.runtime.ensure_vsr_loaded()
+        if self.classes != classes:
+            self.classes = list(classes)
+            n_classes = len(self.classes)
+            self.vsr_probs = np.ones(n_classes, dtype=np.float32) / n_classes
+            self.asr_probs = np.ones(n_classes, dtype=np.float32) / n_classes
+        if self.lip_detector is None:
+            self.lip_detector = LipDetector()
 
     def add_frame(self, frame_bgr: np.ndarray) -> dict | None:
         if self.mode == "asr_only":
+            return None
+
+        self._ensure_vsr_components()
+        if self.lip_detector is None:
             return None
 
         crop = self.lip_detector.crop_lips(frame_bgr)
@@ -137,7 +232,8 @@ class RealtimeSession:
         self.last_vsr_t = now
         clip = torch.stack(list(self.frame_buffer)).unsqueeze(0).to(self.runtime.device)
         with torch.no_grad():
-            logits = self.runtime.vsr_model(clip)
+            vsr_model, _ = self.runtime.ensure_vsr_loaded()
+            logits = vsr_model(clip)
             probs = F.softmax(logits, dim=-1).squeeze(0).cpu().numpy()
 
         self.vsr_probs = probs.astype(np.float32)
@@ -160,6 +256,33 @@ class RealtimeSession:
             return None
 
         self.audio_buffer = np.concatenate([self.audio_buffer, audio_16k])
+
+        if self.mode == "asr_only":
+            max_keep = int(Config.AUDIO_SR * 6.0)
+            if self.audio_buffer.size > max_keep:
+                self.audio_buffer = self.audio_buffer[-max_keep:]
+
+            needed = int(Config.AUDIO_SR * 2.0)
+            if self.audio_buffer.size < needed:
+                return None
+
+            now = time.time()
+            if now - self.last_asr_char_t < 1.8:
+                return None
+
+            self.last_asr_char_t = now
+            window = self.audio_buffer[-needed:]
+            text, confidence = self.runtime.char_asr_engine.transcribe(window)
+            text = text if text else "-"
+            return {
+                "type": "prediction",
+                "mode": "asr_only",
+                "prediction": text,
+                "confidence": confidence,
+                "latency": 200,
+                "asr_prediction": text,
+                "asr_confidence": confidence,
+            }
 
         max_keep = int(Config.AUDIO_SR * 4.0)
         if self.audio_buffer.size > max_keep:
