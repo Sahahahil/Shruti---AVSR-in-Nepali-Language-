@@ -23,7 +23,6 @@ PROCESSOR_PATH = (
     / "wav2vec2-nepali-processor-20260315T054231Z-1-001"
     / "wav2vec2-nepali-processor"
 )
-TRAIN_PROCESSOR_PATH = Path("/home/hasana/Models/wav2vec2-nepali-processor")
 
 
 class RealtimeModelRuntime:
@@ -33,21 +32,22 @@ class RealtimeModelRuntime:
 
     def __init__(self) -> None:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.processor_path = self._resolve_processor_path()
+        self.model_path = self._resolve_hf_dir(WAV2VEC_PATH, ["config.json"])
+        self.processor_path = self._resolve_hf_dir(PROCESSOR_PATH, ["preprocessor_config.json"])
 
         Config.DEVICE = self.device
         Config.VSR_CHECKPOINT = str(VSR_CHECKPOINT_PATH)
-        Config.WAV2VEC_PATH = str(WAV2VEC_PATH)
+        Config.WAV2VEC_PATH = str(self.model_path)
         Config.WAV2VEC_PROCESSOR_PATH = str(self.processor_path)
 
-        # Bias fusion towards ASR because ASR model quality is stronger.
+        # Bias AVSR towards ASR for stronger audio-driven predictions.
         Config.FUSION_MODE = "weighted"
         Config.VSR_WEIGHT = 0.3
         Config.ASR_WEIGHT = 0.7
 
         Config.NUM_FRAMES = 15
         Config.INFERENCE_EVERY_N_FRAMES = 1
-        Config.AUDIO_WINDOW_S = 1.6
+        Config.AUDIO_WINDOW_S = 2.0
 
         self.vsr_model: CNN_LSTM_VSR | None = None
         self.classes = list(Config.CLASSES)
@@ -64,11 +64,20 @@ class RealtimeModelRuntime:
         )
 
     @staticmethod
-    def _resolve_processor_path() -> Path:
-        # Prefer the processor used during training if it exists.
-        if TRAIN_PROCESSOR_PATH.exists():
-            return TRAIN_PROCESSOR_PATH
-        return PROCESSOR_PATH
+    def _resolve_hf_dir(path: Path, required_files: list[str]) -> Path:
+        if not path.exists() or not path.is_dir():
+            raise RuntimeError(f"Required directory does not exist: {path}")
+
+        if all((path / name).exists() for name in required_files):
+            return path
+
+        subdirs = [p for p in path.iterdir() if p.is_dir()]
+        if len(subdirs) == 1 and all((subdirs[0] / name).exists() for name in required_files):
+            return subdirs[0]
+
+        raise RuntimeError(
+            f"Could not find required files {required_files} in {path}"
+        )
 
     @classmethod
     def get_instance(cls) -> RealtimeModelRuntime:
@@ -135,7 +144,7 @@ class CharacterASREngine:
         probs = F.softmax(logits, dim=-1)
         pred_ids = torch.argmax(probs, dim=-1)
 
-        text = self.processor.batch_decode(pred_ids)[0].strip()
+        text = self.processor.batch_decode(pred_ids)[0].replace("|", " ").strip()
 
         token_conf = torch.max(probs, dim=-1).values
         confidence = float(token_conf.mean().item()) if token_conf.numel() else 0.0
@@ -159,6 +168,16 @@ class RealtimeSession:
         self.last_asr_t = 0.0
         self.last_asr_char_t = 0.0
 
+        self.avsr_smoothed_probs = np.ones(n_classes, dtype=np.float32) / n_classes
+
+        # ASR-only utterance segmentation (similar to realtime.py: record until silence).
+        self.asr_only_capturing = False
+        self.asr_only_silence_samples = 0
+        self.asr_only_energy_threshold = 0.015
+        self.asr_only_silence_limit = int(Config.AUDIO_SR * 0.8)
+        self.asr_only_max_samples = int(Config.AUDIO_SR * 5.0)
+        self.asr_only_min_samples = int(Config.AUDIO_SR * 0.4)
+
         self.lip_detector: LipDetector | None = None
 
     def close(self) -> None:
@@ -180,6 +199,9 @@ class RealtimeSession:
         self.last_vsr_t = 0.0
         self.last_asr_t = 0.0
         self.last_asr_char_t = 0.0
+        self.avsr_smoothed_probs = np.ones(n_classes, dtype=np.float32) / n_classes
+        self.asr_only_capturing = False
+        self.asr_only_silence_samples = 0
 
     def _ensure_vsr_components(self) -> None:
         _, classes = self.runtime.ensure_vsr_loaded()
@@ -242,22 +264,40 @@ class RealtimeSession:
         self.audio_buffer = np.concatenate([self.audio_buffer, audio_16k])
 
         if self.mode == "asr_only":
-            max_keep = int(Config.AUDIO_SR * 6.0)
-            if self.audio_buffer.size > max_keep:
-                self.audio_buffer = self.audio_buffer[-max_keep:]
+            chunk_rms = float(np.sqrt(np.mean(np.square(audio_16k)))) if audio_16k.size else 0.0
+            is_speech = chunk_rms > self.asr_only_energy_threshold
 
-            needed = int(Config.AUDIO_SR * 2.0)
-            if self.audio_buffer.size < needed:
+            if is_speech:
+                self.asr_only_capturing = True
+                self.asr_only_silence_samples = 0
+            elif self.asr_only_capturing:
+                self.asr_only_silence_samples += int(audio_16k.size)
+
+            if not self.asr_only_capturing:
+                self.audio_buffer = np.array([], dtype=np.float32)
                 return None
 
-            now = time.time()
-            if now - self.last_asr_char_t < 1.8:
+            if self.audio_buffer.size > self.asr_only_max_samples:
+                should_finalize = True
+            else:
+                should_finalize = self.asr_only_silence_samples >= self.asr_only_silence_limit
+
+            if not should_finalize:
                 return None
 
-            self.last_asr_char_t = now
-            window = self.audio_buffer[-needed:]
-            text, confidence = self.runtime.char_asr_engine.transcribe(window)
-            text = text if text else "-"
+            utterance = self.audio_buffer.copy()
+            self.audio_buffer = np.array([], dtype=np.float32)
+            self.asr_only_capturing = False
+            self.asr_only_silence_samples = 0
+
+            if utterance.size < self.asr_only_min_samples:
+                return None
+
+            _, probs = self.runtime.asr_engine.transcribe(utterance)
+            probs = probs.astype(np.float32)
+            pred_idx = int(np.argmax(probs))
+            text = self.classes[pred_idx]
+            confidence = float(np.max(probs))
             return {
                 "type": "prediction",
                 "mode": "asr_only",
@@ -319,8 +359,12 @@ class RealtimeSession:
             }
 
         fused_probs, w_vsr, w_asr = fuse_predictions(self.vsr_probs, self.asr_probs, mode=Config.FUSION_MODE)
-        f_idx = int(np.argmax(fused_probs))
-        f_conf = float(np.max(fused_probs))
+        alpha = float(getattr(Config, "SMOOTHING_ALPHA", 0.3))
+        self.avsr_smoothed_probs = alpha * fused_probs + (1.0 - alpha) * self.avsr_smoothed_probs
+        self.avsr_smoothed_probs = self.avsr_smoothed_probs / max(float(np.sum(self.avsr_smoothed_probs)), 1e-8)
+
+        f_idx = int(np.argmax(self.avsr_smoothed_probs))
+        f_conf = float(np.max(self.avsr_smoothed_probs))
 
         return {
             "type": "prediction",

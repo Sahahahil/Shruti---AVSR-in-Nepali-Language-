@@ -42,6 +42,10 @@ const TRAINED_WORD_CLASSES = [
   '\u0930\u094b\u0915',
 ];
 
+const SPEAK_WINDOW_MS = 3000;
+const PROCESSING_WINDOW_MS = 700;
+const OUTPUT_HOLD_MS = 2500;
+
 const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
   mode,
   title,
@@ -52,12 +56,20 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
 }) => {
   const wsRef = useRef<WebSocket | null>(null);
   const audioStepRef = useRef(0);
+  const speakTimerRef = useRef<number | null>(null);
+  const processTimerRef = useRef<number | null>(null);
+  const holdTimerRef = useRef<number | null>(null);
+  const asrProcessTimerRef = useRef<number | null>(null);
+  const asrHoldTimerRef = useRef<number | null>(null);
+  const candidateStatsRef = useRef<Map<string, { count: number; best: LivePrediction }>>(new Map());
+  const avsrCycleModeRef = useRef<'idle' | 'speak' | 'processing' | 'holding'>('idle');
 
   const [isStreaming, setIsStreaming] = useState(false);
   const [status, setStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState<LivePrediction | null>(null);
-  const [history, setHistory] = useState<LivePrediction[]>([]);
+  const [avsrCycleMode, setAvsrCycleMode] = useState<'idle' | 'speak' | 'processing' | 'holding'>('idle');
+  const [asrOnlyPhase, setAsrOnlyPhase] = useState<'idle' | 'speak' | 'processing' | 'holding'>('idle');
 
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<{
@@ -71,16 +83,108 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
     return `${base.replace(/^http/, 'ws')}/ws/realtime`;
   }, []);
 
+  const isAvsrTimed = mode === 'avsr';
+
+  const clearAvsrCycle = useCallback(() => {
+    if (speakTimerRef.current) {
+      window.clearTimeout(speakTimerRef.current);
+      speakTimerRef.current = null;
+    }
+    if (processTimerRef.current) {
+      window.clearTimeout(processTimerRef.current);
+      processTimerRef.current = null;
+    }
+    if (holdTimerRef.current) {
+      window.clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    candidateStatsRef.current.clear();
+    avsrCycleModeRef.current = 'idle';
+    setAvsrCycleMode('idle');
+  }, []);
+
+  const clearAsrOnlyCycle = useCallback(() => {
+    if (asrProcessTimerRef.current) {
+      window.clearTimeout(asrProcessTimerRef.current);
+      asrProcessTimerRef.current = null;
+    }
+    if (asrHoldTimerRef.current) {
+      window.clearTimeout(asrHoldTimerRef.current);
+      asrHoldTimerRef.current = null;
+    }
+    setAsrOnlyPhase('idle');
+  }, []);
+
+  const startProcessingCycle = useCallback(() => {
+    if (!isAvsrTimed) {
+      return;
+    }
+
+    candidateStatsRef.current.clear();
+    avsrCycleModeRef.current = 'speak';
+    setAvsrCycleMode('speak');
+
+    if (speakTimerRef.current) {
+      window.clearTimeout(speakTimerRef.current);
+    }
+
+    speakTimerRef.current = window.setTimeout(() => {
+      const candidates = Array.from(candidateStatsRef.current.values());
+      let selectedBest: LivePrediction | null = null;
+      if (candidates.length > 0) {
+        const selected = candidates.reduce((bestSoFar, current) => {
+          if (current.count > bestSoFar.count) {
+            return current;
+          }
+          if (current.count === bestSoFar.count && current.best.confidence > bestSoFar.best.confidence) {
+            return current;
+          }
+          return bestSoFar;
+        }, candidates[0]);
+        selectedBest = selected.best;
+      }
+
+      candidateStatsRef.current.clear();
+
+      avsrCycleModeRef.current = 'processing';
+      setAvsrCycleMode('processing');
+
+      if (processTimerRef.current) {
+        window.clearTimeout(processTimerRef.current);
+      }
+
+      processTimerRef.current = window.setTimeout(() => {
+        if (selectedBest) {
+          setLive(selectedBest);
+        }
+        avsrCycleModeRef.current = 'holding';
+        setAvsrCycleMode('holding');
+
+        if (holdTimerRef.current) {
+          window.clearTimeout(holdTimerRef.current);
+        }
+
+        holdTimerRef.current = window.setTimeout(() => {
+          startProcessingCycle();
+        }, OUTPUT_HOLD_MS);
+      }, PROCESSING_WINDOW_MS);
+
+    }, SPEAK_WINDOW_MS);
+  }, [isAvsrTimed]);
+
   const closeSocket = useCallback(() => {
+    clearAvsrCycle();
+    clearAsrOnlyCycle();
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
     }
-  }, []);
+  }, [clearAsrOnlyCycle, clearAvsrCycle]);
 
   const stopStreaming = useCallback(() => {
     setIsStreaming(false);
     setStatus('idle');
+    setLive(null);
     closeSocket();
   }, [closeSocket]);
 
@@ -101,6 +205,13 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
     ws.onopen = () => {
       setStatus('connected');
       setIsStreaming(true);
+      setLive(null);
+      if (isAvsrTimed) {
+        startProcessingCycle();
+      } else if (mode === 'asr_only') {
+        clearAsrOnlyCycle();
+        setAsrOnlyPhase('speak');
+      }
       ws.send(JSON.stringify({ type: 'config', mode }));
     };
 
@@ -123,8 +234,42 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
           asr_weight: msg.asr_weight,
         };
 
+        if (mode === 'asr_only') {
+          clearAsrOnlyCycle();
+          setAsrOnlyPhase('processing');
+          asrProcessTimerRef.current = window.setTimeout(() => {
+            setLive(pred);
+            setAsrOnlyPhase('holding');
+            asrHoldTimerRef.current = window.setTimeout(() => {
+              setAsrOnlyPhase('speak');
+            }, OUTPUT_HOLD_MS);
+          }, PROCESSING_WINDOW_MS);
+          return;
+        }
+
+        if (isAvsrTimed) {
+          if (avsrCycleModeRef.current === 'idle') {
+            startProcessingCycle();
+          }
+
+          if (avsrCycleModeRef.current !== 'speak') {
+            return;
+          }
+
+          const key = pred.prediction || '-';
+          const existing = candidateStatsRef.current.get(key);
+          if (!existing) {
+            candidateStatsRef.current.set(key, { count: 1, best: pred });
+          } else {
+            candidateStatsRef.current.set(key, {
+              count: existing.count + 1,
+              best: pred.confidence > existing.best.confidence ? pred : existing.best,
+            });
+          }
+          return;
+        }
+
         setLive(pred);
-        setHistory((prev) => [pred, ...prev].slice(0, 6));
       } catch {
         setError('Failed to parse realtime response');
       }
@@ -134,13 +279,17 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
       setError('WebSocket connection failed');
       setStatus('error');
       setIsStreaming(false);
+      clearAvsrCycle();
+      clearAsrOnlyCycle();
     };
 
     ws.onclose = () => {
       setIsStreaming(false);
+      clearAvsrCycle();
+      clearAsrOnlyCycle();
       setStatus((prev) => (prev === 'error' ? 'error' : 'idle'));
     };
-  }, [mode, wsUrl]);
+  }, [clearAsrOnlyCycle, clearAvsrCycle, isAvsrTimed, mode, startProcessingCycle, wsUrl]);
 
   const sendFrame = useCallback((dataUrl: string) => {
     if (!isStreaming || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
@@ -255,6 +404,37 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
           <h4 className={styles.featuresTitle}>
             {mode === 'asr_only' ? 'Live ASR Output' : 'Live Transcription'}
           </h4>
+
+          {isStreaming && isAvsrTimed && avsrCycleMode === 'speak' && (
+            <p className={styles.smallNote}>Speak now ({(SPEAK_WINDOW_MS / 1000).toFixed(1)}s capture)...</p>
+          )}
+
+          {isStreaming && isAvsrTimed && avsrCycleMode === 'processing' && (
+            <div className={styles.predictionLoading}>
+              <span className={styles.predictionSpinner} />
+              <p className={styles.smallNote}>Processing captured input...</p>
+            </div>
+          )}
+
+          {isStreaming && isAvsrTimed && avsrCycleMode === 'holding' && (
+            <p className={styles.smallNote}>Showing stable output for {(OUTPUT_HOLD_MS / 1000).toFixed(1)}s.</p>
+          )}
+
+          {isStreaming && mode === 'asr_only' && asrOnlyPhase === 'speak' && (
+            <p className={styles.smallNote}>Speak now...</p>
+          )}
+
+          {isStreaming && mode === 'asr_only' && asrOnlyPhase === 'processing' && (
+            <div className={styles.predictionLoading}>
+              <span className={styles.predictionSpinner} />
+              <p className={styles.smallNote}>Processing captured input...</p>
+            </div>
+          )}
+
+          {isStreaming && mode === 'asr_only' && asrOnlyPhase === 'holding' && (
+            <p className={styles.smallNote}>Showing stable output for {(OUTPUT_HOLD_MS / 1000).toFixed(1)}s.</p>
+          )}
+
           <div className={styles.liveOutput}>
             {live ? (
               <>
@@ -274,31 +454,16 @@ const RealtimeStreamPanel: React.FC<RealtimeStreamPanelProps> = ({
             )}
           </div>
 
-          {(mode === 'avsr' || mode === 'vsr_only') ? (
-            <>
-              <h4 className={styles.featuresTitle}>Trained Word Classes</h4>
-              <div className={styles.historyList}>
-                {TRAINED_WORD_CLASSES.map((word) => (
-                  <div className={styles.historyItem} key={word}>
-                    <span>{word}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <>
-              <h4 className={styles.featuresTitle}>Recent Predictions</h4>
-              <div className={styles.historyList}>
-                {history.length === 0 && <p className={styles.smallNote}>No predictions yet.</p>}
-                {history.map((item, idx) => (
-                  <div className={styles.historyItem} key={`${item.prediction}-${idx}`}>
-                    <span>{item.prediction}</span>
-                    <span>{(item.confidence * 100).toFixed(1)}%</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
+          <>
+            <h4 className={styles.featuresTitle}>Trained Word Classes</h4>
+            <div className={styles.historyList}>
+              {TRAINED_WORD_CLASSES.map((word) => (
+                <div className={styles.historyItem} key={word}>
+                  <span>{word}</span>
+                </div>
+              ))}
+            </div>
+          </>
         </div>
       </div>
     </div>
