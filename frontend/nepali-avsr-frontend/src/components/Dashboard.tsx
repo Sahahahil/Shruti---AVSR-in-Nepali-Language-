@@ -32,8 +32,8 @@ const tabs: TabConfig[] = [
   },
   {
     id: 'asr_only',
-    label: 'ASR + Video Upload',
-    description: 'Live microphone ASR plus video+audio upload processed as audio-only.',
+    label: 'ASR Only',
+    description: 'Live character-level wav2vec2 transcription from microphone audio.',
     component: RealtimeASR_VideoInput,
   },
 ];

@@ -31,7 +31,12 @@ const RealtimeAudio: React.FC<RealtimeAudioProps> = ({ isStreaming, onAudio }) =
     const start = async () => {
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true },
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+            channelCount: 1,
+          },
           video: false,
         });
 
